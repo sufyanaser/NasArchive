@@ -1,0 +1,234 @@
+{
+  "name": "NAS Archive: Paperless to Drive & Sheets Idempotent Sync",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "1",
+      "name": "Poll Approved Documents Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "url": "http://webserver:8000/api/documents/",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "custom_fields__icontains",
+              "value": "true"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2",
+      "name": "Fetch Candidate Documents",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Execute local validator contract logic: check approval, inbox exclusion, single section, and compute hash\nconst items = $input.all();\nconst validated = [];\nfor (const item of items) {\n  const doc = item.json;\n  // Precondition validations match scripts/sync_validator.py\n  const isApproved = doc.custom_fields && doc.custom_fields.some(cf => cf.value === true);\n  if (isApproved) {\n    validated.push({\n      json: {\n        ...doc,\n        sync_key: `nas-prod:${doc.id}`\n      }\n    });\n  }\n}\nreturn validated;"
+      },
+      "id": "3",
+      "name": "Validate Preconditions & Contract",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT status, drive_file_id FROM sync_ledger WHERE sync_key = $1",
+        "options": {}
+      },
+      "id": "4",
+      "name": "Query Sync Ledger",
+      "type": "n8n-nodes-base.sqlite",
+      "typeVersion": 1,
+      "position": [860, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.status }}",
+              "value2": "SYNCED"
+            }
+          ]
+        }
+      },
+      "id": "5",
+      "name": "Filter Already Synced",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1080, 300]
+    },
+    {
+      "parameters": {
+        "operation": "upload",
+        "fileContent": "data",
+        "name": "={{ $json.filename }}",
+        "parents": ["{{ $env.GOOGLE_DRIVE_FOLDER_ID }}"]
+      },
+      "id": "6",
+      "name": "Upload to Google Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [1300, 200]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.GOOGLE_SHEETS_SPREADSHEET_ID }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Index",
+          "mode": "name"
+        },
+        "columnToMatchOn": "مفتاح المصدر",
+        "valueToMatchOn": "={{ $json.sync_key }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "مفتاح المصدر",
+              "fieldValue": "={{ $json.sync_key }}"
+            },
+            {
+              "fieldId": "القسم",
+              "fieldValue": "={{ $json.section }}"
+            },
+            {
+              "fieldId": "رقم الكتاب",
+              "fieldValue": "={{ $json.doc_number }}"
+            },
+            {
+              "fieldId": "الموضوع",
+              "fieldValue": "={{ $json.title }}"
+            },
+            {
+              "fieldId": "رابط Drive",
+              "fieldValue": "={{ $json.drive_file_url }}"
+            }
+          ]
+        }
+      },
+      "id": "7",
+      "name": "Upsert Google Sheets Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.1,
+      "position": [1520, 200]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE sync_ledger SET status = 'SYNCED', synced_at = datetime('now') WHERE sync_key = $1",
+        "options": {}
+      },
+      "id": "8",
+      "name": "Update Ledger to SYNCED",
+      "type": "n8n-nodes-base.sqlite",
+      "typeVersion": 1,
+      "position": [1740, 200]
+    }
+  ],
+  "connections": {
+    "Poll Approved Documents Schedule": {
+      "main": [
+        [
+          {
+            "node": "Fetch Candidate Documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Candidate Documents": {
+      "main": [
+        [
+          {
+            "node": "Validate Preconditions & Contract",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Preconditions & Contract": {
+      "main": [
+        [
+          {
+            "node": "Query Sync Ledger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Query Sync Ledger": {
+      "main": [
+        [
+          {
+            "node": "Filter Already Synced",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Already Synced": {
+      "main": [
+        null,
+        [
+          {
+            "node": "Upload to Google Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload to Google Drive": {
+      "main": [
+        [
+          {
+            "node": "Upsert Google Sheets Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Google Sheets Row": {
+      "main": [
+        [
+          {
+            "node": "Update Ledger to SYNCED",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

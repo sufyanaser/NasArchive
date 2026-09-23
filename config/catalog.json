@@ -1,0 +1,26 @@
+{
+  "tags": [
+    {"name": "شخصي", "matching_algorithm": 0, "is_inbox_tag": false},
+    {"name": "الرنين", "matching_algorithm": 0, "is_inbox_tag": false},
+    {"name": "تناسق", "matching_algorithm": 0, "is_inbox_tag": false},
+    {"name": "NAS FM", "matching_algorithm": 0, "is_inbox_tag": false},
+    {"name": "بانتظار المراجعة", "matching_algorithm": 0, "is_inbox_tag": true}
+  ],
+  "document_types": [
+    {"name": "كتاب وارد", "matching_algorithm": 0},
+    {"name": "كتاب صادر", "matching_algorithm": 0},
+    {"name": "كتاب داخلي", "matching_algorithm": 0}
+  ],
+  "custom_fields": [
+    {"name": "رقم الكتاب", "data_type": "string"},
+    {"name": "الجهة المرسلة", "data_type": "string"},
+    {"name": "الجهة المستلمة", "data_type": "string"},
+    {"name": "تاريخ الورود", "data_type": "date"},
+    {"name": "رقم القيد", "data_type": "string"},
+    {"name": "الكتاب المرجعي", "data_type": "documentlink"},
+    {"name": "ملاحظات", "data_type": "longtext"},
+    {"name": "معتمد للمزامنة", "data_type": "boolean"},
+    {"name": "راجعه", "data_type": "string"},
+    {"name": "تاريخ المراجعة", "data_type": "date"}
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "name": "nas-archive",
+  "services": {
+    "broker": {
+      "image": "docker.io/valkey/valkey:9-alpine",
+      "restart": "unless-stopped",
+      "volumes": ["broker-data:/data"],
+      "healthcheck": {"test": ["CMD", "valkey-cli", "ping"], "interval": "10s", "timeout": "5s", "retries": 5}
+    },
+    "db": {
+      "image": "docker.io/library/postgres:18",
+      "restart": "unless-stopped",
+      "volumes": ["db-data:/var/lib/postgresql"],
+      "environment": {
+        "POSTGRES_DB": "paperless", "POSTGRES_USER": "paperless",
+        "POSTGRES_PASSWORD": "${POSTGRES_PASSWORD:?Run scripts/Initialize.ps1 first}"
+      },
+      "healthcheck": {"test": ["CMD-SHELL", "pg_isready -U paperless -d paperless"], "interval": "10s", "timeout": "5s", "retries": 5}
+    },
+    "webserver": {
+      "image": "ghcr.io/paperless-ngx/paperless-ngx:3.2.1",
+      "restart": "unless-stopped",
+      "depends_on": {"db": {"condition": "service_healthy"}, "broker": {"condition": "service_healthy"}},
+      "ports": ["127.0.0.1:8000:8000"],
+      "volumes": [
+        "paperless-data:/usr/src/paperless/data",
+        "paperless-media:/usr/src/paperless/media",
+        "./runtime/consume:/usr/src/paperless/consume",
+        "./runtime/export:/usr/src/paperless/export"
+      ],
+      "environment": {
+        "PAPERLESS_REDIS": "redis://broker:6379",
+        "PAPERLESS_DBHOST": "db", "PAPERLESS_DBENGINE": "postgresql",
+        "PAPERLESS_DBNAME": "paperless", "PAPERLESS_DBUSER": "paperless",
+        "PAPERLESS_DBPASS": "${POSTGRES_PASSWORD:?Run scripts/Initialize.ps1 first}",
+        "PAPERLESS_SECRET_KEY": "${PAPERLESS_SECRET_KEY:?Run scripts/Initialize.ps1 first}",
+        "PAPERLESS_URL": "http://localhost:8000",
+        "PAPERLESS_TIME_ZONE": "Asia/Baghdad",
+        "PAPERLESS_OCR_LANGUAGES": "ara",
+        "PAPERLESS_OCR_LANGUAGE": "ara+eng",
+        "PAPERLESS_OCR_MODE": "auto",
+        "PAPERLESS_CONSUMER_RECURSIVE": "true",
+        "PAPERLESS_CONSUMER_SUBDIRS_AS_TAGS": "true",
+        "PAPERLESS_CONSUMER_POLLING_INTERVAL": "10",
+        "PAPERLESS_CONSUMER_STABILITY_DELAY": "10",
+        "PAPERLESS_AI_ENABLED": "false"
+      }
+    }
+  },
+  "volumes": {"broker-data": {}, "db-data": {}, "paperless-data": {}, "paperless-media": {}}
+}
