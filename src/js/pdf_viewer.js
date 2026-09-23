@@ -26,15 +26,37 @@ class PdfViewer {
     this.ctx = this.canvas.getContext('2d');
   }
 
-  async loadDocument(urlOrData) {
+  async loadDocument(urlOrData, retryCallback = null) {
+    this.lastSource = urlOrData;
+    this.lastRetryCallback = retryCallback;
+
     if (!window.pdfjsLib) {
       console.error('PDF.js library not loaded.');
+      this._showError('مكتبة عرض PDF غير محملة على النظام.', retryCallback);
       return;
     }
 
     try {
       this._showLoading(true);
-      const loadingTask = window.pdfjsLib.getDocument(urlOrData);
+
+      let docParam = urlOrData;
+      // Handle base64 string
+      if (typeof urlOrData === 'string' && !urlOrData.startsWith('http://') && !urlOrData.startsWith('https://') && !urlOrData.startsWith('data:')) {
+        try {
+          const binaryStr = atob(urlOrData);
+          const bytes = new Uint8Array(binaryStr.length);
+          for (let i = 0; i < binaryStr.length; i++) {
+            bytes[i] = binaryStr.charCodeAt(i);
+          }
+          docParam = { data: bytes };
+        } catch (b64Err) {
+          docParam = urlOrData;
+        }
+      } else if (urlOrData instanceof Uint8Array || urlOrData instanceof ArrayBuffer) {
+        docParam = { data: urlOrData };
+      }
+
+      const loadingTask = window.pdfjsLib.getDocument(docParam);
       this.pdfDoc = await loadingTask.promise;
       this.pageNum = 1;
       this.rotation = 0;
@@ -47,7 +69,9 @@ class PdfViewer {
       await this.renderPage(this.pageNum);
     } catch (error) {
       this._showLoading(false);
-      this._showError(error.message || 'فشل تحميل ملف المعاينة');
+      console.error('PdfViewer load error:', error);
+      const msg = error.message || 'فشل تحميل ملف المعاينة';
+      this._showError(msg, retryCallback);
     }
   }
 
@@ -204,16 +228,41 @@ class PdfViewer {
     }
   }
 
-  _showError(msg) {
+  _showError(msg, retryCallback = null) {
     if (!this.container) return;
+    const cleanMsg = (typeof msg === 'string')
+      ? msg.replace(/^Missing PDF ".*"$/, 'تعذر تحميل ملف المعاينة (الملف غير متاح أو تالف).')
+      : 'فشل تحميل ملف المعاينة';
+
+    const effectiveRetry = retryCallback || this.lastRetryCallback;
+
     this.container.innerHTML = `
-      <div class="preview-empty-state" style="color: #ef4444;">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+      <div class="preview-empty-state" style="color: #ef4444; padding: 24px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width: 48px; height: 48px; margin-bottom: 12px;">
           <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
         </svg>
-        <div style="font-weight: 600; font-size: 14px;">${msg}</div>
+        <div style="font-weight: 600; font-size: 15px; margin-bottom: 6px;">تعذر عرض المعاينة</div>
+        <div style="font-size: 13px; color: #94a3b8; max-width: 320px; line-height: 1.5; margin-bottom: 16px;">${cleanMsg}</div>
+        ${effectiveRetry ? `
+          <button id="btnRetryPreviewAction" class="btn btn-secondary" style="font-size: 13px; padding: 6px 16px; border: 1px solid #475569; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; border-radius: 6px; background: rgba(30, 41, 59, 0.8); color: #f8fafc;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width: 14px; height: 14px;">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            <span>إعادة محاولة المعاينة</span>
+          </button>
+        ` : ''}
       </div>
     `;
+
+    if (effectiveRetry) {
+      const btn = this.container.querySelector('#btnRetryPreviewAction');
+      if (btn) {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          effectiveRetry();
+        });
+      }
+    }
   }
 }
 

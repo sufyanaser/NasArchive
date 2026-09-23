@@ -17,7 +17,7 @@ import threading
 import time
 from typing import Any, Dict, List, Optional
 from urllib.error import HTTPError, URLError
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlparse, unquote, quote
 from urllib.request import Request, urlopen
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -161,11 +161,46 @@ def check_paperless_online() -> bool:
 
 def sanitize_filename(filename: str) -> str:
     """Sanitize filename to prevent directory traversal and invalid characters."""
-    base = os.path.basename(filename).strip()
+    base = os.path.basename(unquote(str(filename))).strip()
     safe = re.sub(r'[^a-zA-Z0-9_\-\.\u0600-\u06FF]', '_', base)
     if not safe or safe.startswith('.'):
         safe = f"upload_{int(time.time())}.pdf"
     return safe
+
+
+def validate_staged_file(filepath: Path) -> Dict[str, Any]:
+    """Validate existence, non-emptiness, and format integrity of a staged file."""
+    if not filepath.exists() or not filepath.is_file():
+        return {'valid': False, 'error': 'المستند غير موجود في مساحة المعاينة المؤقتة.'}
+    size = filepath.stat().st_size
+    if size == 0:
+        return {'valid': False, 'error': 'ملف المستند فارغ (0 بايت) ولا يمكن أرشفته.'}
+
+    ext = filepath.suffix.lower()
+    if ext == '.pdf':
+        try:
+            with open(filepath, 'rb') as f:
+                header = f.read(1024)
+                if not header.startswith(b'%PDF-'):
+                    return {'valid': False, 'error': 'ملف المستند تالف أو لا يحتوي على ترويسة PDF القياسية.'}
+        except Exception as e:
+            return {'valid': False, 'error': f'تعذر قراءة ملف PDF: {e}'}
+    elif ext in ('.jpg', '.jpeg', '.png', '.tif', '.tiff'):
+        try:
+            with open(filepath, 'rb') as f:
+                header = f.read(16)
+                if ext in ('.jpg', '.jpeg') and not header.startswith(b'\xff\xd8'):
+                    return {'valid': False, 'error': 'ملف الصورة JPEG تالف.'}
+                elif ext == '.png' and not header.startswith(b'\x89PNG'):
+                    return {'valid': False, 'error': 'ملف الصورة PNG تالف.'}
+                elif ext in ('.tif', '.tiff') and not (header.startswith(b'II*\x00') or header.startswith(b'MM\x00*')):
+                    return {'valid': False, 'error': 'ملف الصورة TIFF تالف.'}
+        except Exception as e:
+            return {'valid': False, 'error': f'تعذر قراءة ملف الصورة: {e}'}
+    else:
+        return {'valid': False, 'error': f'صيغة الملف غير مدعومة: {ext}'}
+
+    return {'valid': True, 'size_bytes': size, 'filename': filepath.name}
 
 
 def poll_paperless_consumption(target_filename: str, timeout_seconds: int = 120) -> Optional[Dict[str, Any]]:
@@ -340,11 +375,12 @@ def background_task_worker(task_id: str, task_type: str, params: Dict[str, Any])
 
         elif task_type == 'archive':
             # Stage B: Explicit archive of an already staged document
-            raw_filename = params.get('filename') or params.get('staging_file') or ''
+            raw_filename = unquote(params.get('filename') or params.get('staging_file') or '')
             safe_name = sanitize_filename(raw_filename)
             staging_path = STAGING_DIR / safe_name
-            if not staging_path.exists():
-                raise FileNotFoundError(f'الملف المؤقت غير موجود: {safe_name}')
+            val = validate_staged_file(staging_path)
+            if not val['valid']:
+                raise ValueError(f"فشل التحقق من المستند قبل الأرشفة: {val.get('error')}")
 
             filename = staging_path.name
             with TASKS_LOCK:
@@ -474,7 +510,8 @@ class ScannerBridgeHandler(BaseHTTPRequestHandler):
         """Send local security and CORS headers."""
         self.send_header('Access-Control-Allow-Origin', '*')
         self.send_header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Range')
+        self.send_header('Access-Control-Expose-Headers', 'Accept-Ranges, Content-Range, Content-Length, Content-Disposition')
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.send_header('X-Frame-Options', 'SAMEORIGIN')
 
@@ -531,7 +568,7 @@ class ScannerBridgeHandler(BaseHTTPRequestHandler):
                     'default_driver': 'wia',
                     'detected_devices': detected,
                 },
-                'version': '1.2.0'
+                'version': '1.2.1'
             })
             return
 
@@ -590,15 +627,28 @@ class ScannerBridgeHandler(BaseHTTPRequestHandler):
             self.send_json(200, tasks_list[:25])
             return
 
-        # API: Staged Document Preview
+        # API: Staged Document Validation
+        if path.startswith('/api/staging/') and path.endswith('/validate'):
+            raw_filename = unquote(path[len('/api/staging/'):-len('/validate')])
+            safe_name = sanitize_filename(raw_filename)
+            target_path = STAGING_DIR / safe_name
+            val = validate_staged_file(target_path)
+            if not val['valid']:
+                self.send_json(400, val)
+            else:
+                self.send_json(200, val)
+            return
+
+        # API: Staged Document Preview (Full and Range streaming)
         if path.startswith('/api/staging/'):
-            raw_filename = path[len('/api/staging/'):]
+            raw_filename = unquote(path[len('/api/staging/'):])
             safe_name = sanitize_filename(raw_filename)
             target_path = STAGING_DIR / safe_name
             if not target_path.exists() or not target_path.is_file():
                 self.send_json(404, {'error': 'Staged document not found'})
                 return
 
+            file_size = target_path.stat().st_size
             ext = target_path.suffix.lower()
             mime = 'application/pdf'
             if ext in ('.jpg', '.jpeg'):
@@ -608,12 +658,46 @@ class ScannerBridgeHandler(BaseHTTPRequestHandler):
             elif ext in ('.tif', '.tiff'):
                 mime = 'image/tiff'
 
+            encoded_filename = quote(safe_name)
+            content_disp = f"inline; filename=\"preview.pdf\"; filename*=UTF-8''{encoded_filename}"
+
+            range_header = self.headers.get('Range')
+            if range_header and range_header.startswith('bytes='):
+                try:
+                    parts = range_header[6:].split('-')
+                    start = int(parts[0]) if parts[0] else 0
+                    end = int(parts[1]) if len(parts) > 1 and parts[1] else file_size - 1
+                    if start >= file_size or end >= file_size or start > end:
+                        self.send_response(416)
+                        self.send_header('Content-Range', f'bytes */{file_size}')
+                        self.send_cors_and_security_headers()
+                        self.end_headers()
+                        return
+
+                    length = end - start + 1
+                    with open(target_path, 'rb') as f:
+                        f.seek(start)
+                        chunk = f.read(length)
+
+                    self.send_response(206)
+                    self.send_header('Content-Type', mime)
+                    self.send_header('Content-Range', f'bytes {start}-{end}/{file_size}')
+                    self.send_header('Content-Length', str(len(chunk)))
+                    self.send_header('Accept-Ranges', 'bytes')
+                    self.send_header('Content-Disposition', content_disp)
+                    self.send_cors_and_security_headers()
+                    self.end_headers()
+                    self.wfile.write(chunk)
+                    return
+                except Exception as range_err:
+                    logger.warning("Error processing Range request: %s", range_err)
+
             file_bytes = target_path.read_bytes()
             self.send_response(200)
             self.send_header('Content-Type', mime)
             self.send_header('Content-Length', str(len(file_bytes)))
             self.send_header('Accept-Ranges', 'bytes')
-            self.send_header('Content-Disposition', f'inline; filename="{safe_name}"')
+            self.send_header('Content-Disposition', content_disp)
             self.send_cors_and_security_headers()
             self.end_headers()
             self.wfile.write(file_bytes)
@@ -626,7 +710,7 @@ class ScannerBridgeHandler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = parsed.path.rstrip('/')
         if path.startswith('/api/staging/'):
-            raw_filename = path[len('/api/staging/'):]
+            raw_filename = unquote(path[len('/api/staging/'):])
             safe_name = sanitize_filename(raw_filename)
             target_path = STAGING_DIR / safe_name
             if target_path.exists() and target_path.is_file():
@@ -744,8 +828,13 @@ class ScannerBridgeHandler(BaseHTTPRequestHandler):
 
             safe_name = sanitize_filename(raw_filename)
             staging_file = STAGING_DIR / safe_name
-            if not staging_file.exists():
+            if not staging_file.exists() or not staging_file.is_file():
                 self.send_json(404, {'error': f'Staged file not found: {safe_name}'})
+                return
+
+            val = validate_staged_file(staging_file)
+            if not val['valid']:
+                self.send_json(400, {'error': f"فشل التحقق من المستند قبل الأرشفة: {val.get('error')}"})
                 return
 
             section = data.get('section', 'شخصي')

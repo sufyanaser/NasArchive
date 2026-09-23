@@ -137,13 +137,12 @@ class ScannerController {
         this.stagedDoc = task.result;
         this._showProgress(false);
 
-        // Load preview immediately on the right pane
-        const previewUrl = `http://127.0.0.1:8001${task.result.preview_url}`;
-        await this.pdfViewer.loadDocument(previewUrl);
-
         // Transition buttons: hide Start Scan, show Rescan and Archive
         this.dom.initialActions.style.display = 'none';
         this.dom.twoStageActions.classList.add('visible');
+
+        // Load preview and validate staged document
+        await this.loadAndValidatePreview();
       } else {
         throw new Error(task.error || 'تعذر استلام بيانات المعاينة.');
       }
@@ -153,6 +152,69 @@ class ScannerController {
     } finally {
       this.dom.startScanBtn.disabled = false;
     }
+  }
+
+  /**
+   * Loads staged document preview using secure local IPC first, falling back to HTTP.
+   * Validates file integrity and disables Archive if file is invalid or missing.
+   */
+  async loadAndValidatePreview() {
+    if (!this.stagedDoc) return;
+    const filename = this.stagedDoc.filename;
+
+    let isValid = false;
+    let previewData = null;
+
+    // 1. Try local direct IPC (Electron secure sandbox)
+    if (window.nasArchive && window.nasArchive.staging) {
+      try {
+        const localRes = await window.nasArchive.staging.read(filename);
+        if (localRes.success && localRes.base64) {
+          isValid = true;
+          previewData = localRes.base64;
+        } else {
+          console.warn('Local IPC staging read returned error:', localRes.error);
+        }
+      } catch (ipcErr) {
+        console.warn('Local IPC staging read exception:', ipcErr);
+      }
+    }
+
+    // 2. Fallback: Validate via HTTP bridge if IPC not available
+    if (!isValid) {
+      try {
+        const encName = encodeURIComponent(filename);
+        const valRes = await fetch(`http://127.0.0.1:8001/api/staging/${encName}/validate`);
+        if (valRes.ok) {
+          const valJson = await valRes.json();
+          if (valJson.valid) {
+            isValid = true;
+            previewData = `http://127.0.0.1:8001/api/staging/${encName}`;
+          }
+        }
+      } catch (httpValErr) {
+        console.warn('Bridge HTTP validation error:', httpValErr);
+      }
+    }
+
+    // Requirement 9: Prevent Archive action if staged file is missing, corrupted or invalid
+    if (!isValid) {
+      this.dom.archiveBtn.disabled = true;
+      this.dom.rescanBtn.disabled = false;
+      this.pdfViewer._showError(
+        'المستند الممسوح مفقود أو تالف ولا يمكن أرشفته. يرجى الضغط على «إعادة المسح».',
+        () => this.loadAndValidatePreview()
+      );
+      return;
+    }
+
+    // Document is valid! Enable Archive and Rescan
+    this.dom.archiveBtn.disabled = false;
+    this.dom.rescanBtn.disabled = false;
+
+    // Load preview with retry callback (Requirement 10: retry without deleting scan)
+    const retryCallback = () => this.loadAndValidatePreview();
+    await this.pdfViewer.loadDocument(previewData || `http://127.0.0.1:8001/api/staging/${encodeURIComponent(filename)}`, retryCallback);
   }
 
   /**
@@ -191,9 +253,8 @@ class ScannerController {
         this.stagedDoc = task.result;
         this._showProgress(false);
 
-        // Update preview
-        const previewUrl = `http://127.0.0.1:8001${task.result.preview_url}`;
-        await this.pdfViewer.loadDocument(previewUrl);
+        // Load preview and validate new staged document
+        await this.loadAndValidatePreview();
       } else {
         throw new Error(task.error || 'فشلت إعادة المسح.');
       }
@@ -212,6 +273,19 @@ class ScannerController {
    */
   async executeStageBArchive() {
     if (!this.stagedDoc) return;
+
+    // Validate before submitting to archive
+    if (window.nasArchive && window.nasArchive.staging) {
+      try {
+        const v = await window.nasArchive.staging.validate(this.stagedDoc.filename);
+        if (!v.valid) {
+          alert(`تعذر أرشفة الوثيقة:\n${v.error || 'المستند غير صالح أو تالف'}`);
+          return;
+        }
+      } catch (valErr) {
+        // Continue to server validation
+      }
+    }
 
     const payload = {
       filename: this.stagedDoc.filename,

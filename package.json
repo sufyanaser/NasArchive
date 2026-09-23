@@ -1,6 +1,6 @@
 {
   "name": "nas-archive",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "NAS Archive — نظام الأرشفة الذكي والمسح الضوئي المكتبي المتكامل",
   "main": "electron/main.js",
   "scripts": {

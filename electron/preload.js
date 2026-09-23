@@ -42,4 +42,10 @@ contextBridge.exposeInMainWorld('nasArchive', {
     set: (key, value) => ipcRenderer.invoke('prefs:set', key, value),
     getAll: () => ipcRenderer.invoke('prefs:get-all'),
   },
+
+  // Staged Document Access (Direct local IPC without network exposure)
+  staging: {
+    read: (filename) => ipcRenderer.invoke('staging:read', filename),
+    validate: (filename) => ipcRenderer.invoke('staging:validate', filename),
+  },
 });

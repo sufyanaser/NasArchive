@@ -7,6 +7,7 @@ import threading
 import time
 import unittest
 from urllib.error import HTTPError
+from urllib.parse import quote
 from urllib.request import Request, urlopen
 from http.server import ThreadingHTTPServer
 
@@ -39,18 +40,22 @@ class ScannerBridgeTests(unittest.TestCase):
         cls.httpd.shutdown()
         cls.httpd.server_close()
 
-    def _request(self, path: str, method: str = 'GET', data: dict = None):
+    def _request(self, path: str, method: str = 'GET', data: dict = None, headers: dict = None, raw_bytes: bool = False):
         """Helper to send HTTP request to test bridge."""
         url = f'{self.base_url}{path}'
         req_data = json.dumps(data).encode('utf-8') if data else None
-        headers = {'Content-Type': 'application/json'} if req_data else {}
-        req = Request(url, data=req_data, headers=headers, method=method)
+        req_headers = {'Content-Type': 'application/json'} if req_data else {}
+        if headers:
+            req_headers.update(headers)
+        req = Request(url, data=req_data, headers=req_headers, method=method)
         try:
             with urlopen(req, timeout=5) as resp:
-                body = resp.read().decode('utf-8')
+                raw = resp.read()
+                body = raw if raw_bytes else raw.decode('utf-8')
                 return resp.status, resp.headers, body
         except HTTPError as err:
-            err_body = err.read().decode('utf-8')
+            raw_err = err.read()
+            err_body = raw_err if raw_bytes else raw_err.decode('utf-8')
             return err.code, err.headers, err_body
 
     def test_web_ui_served(self):
@@ -233,6 +238,93 @@ class ScannerBridgeTests(unittest.TestCase):
         self.assertEqual(status, 404)
         data = json.loads(body)
         self.assertIn('not found', data.get('error', '').lower())
+
+    def test_staging_preview_with_arabic_filename(self):
+        """Verify staging preview properly unquotes and serves files with Arabic filenames."""
+        valid_pdf = b'%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n'
+        arabic_fn = f"scan_{int(time.time())}_شخصي_اختبار.pdf"
+        staged_path = scanner_bridge.STAGING_DIR / arabic_fn
+        staged_path.write_bytes(valid_pdf)
+
+        try:
+            # Request using URL-encoded path component
+            encoded_url = f"/api/staging/{quote(arabic_fn)}"
+            status, headers, body = self._request(encoded_url, raw_bytes=True)
+            self.assertEqual(status, 200)
+            self.assertEqual(headers.get('Content-Type'), 'application/pdf')
+            self.assertIn('preview.pdf', headers.get('Content-Disposition', ''))
+            self.assertIn("filename*=UTF-8''", headers.get('Content-Disposition', ''))
+            self.assertEqual(body, valid_pdf)
+        finally:
+            if staged_path.exists():
+                staged_path.unlink()
+
+    def test_staging_preview_range_request(self):
+        """Verify HTTP 206 Partial Content range requests for PDF.js streaming."""
+        valid_pdf = b'%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n'
+        fn = f"range_test_{int(time.time())}.pdf"
+        staged_path = scanner_bridge.STAGING_DIR / fn
+        staged_path.write_bytes(valid_pdf)
+
+        try:
+            status, headers, body = self._request(
+                f'/api/staging/{fn}',
+                headers={'Range': 'bytes=0-10'},
+                raw_bytes=True
+            )
+            self.assertEqual(status, 206)
+            self.assertEqual(headers.get('Content-Type'), 'application/pdf')
+            self.assertEqual(headers.get('Content-Range'), f'bytes 0-10/{len(valid_pdf)}')
+            self.assertEqual(len(body), 11)
+            self.assertEqual(body, valid_pdf[:11])
+        finally:
+            if staged_path.exists():
+                staged_path.unlink()
+
+    def test_staging_validate_endpoint(self):
+        """Verify /api/staging/<filename>/validate verifies existence and PDF integrity."""
+        valid_pdf = b'%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n'
+        arabic_fn = f"val_test_{int(time.time())}_عربي.pdf"
+        staged_path = scanner_bridge.STAGING_DIR / arabic_fn
+        staged_path.write_bytes(valid_pdf)
+
+        try:
+            # 1. Valid file
+            enc_name = quote(arabic_fn)
+            status, _, body = self._request(f'/api/staging/{enc_name}/validate')
+            self.assertEqual(status, 200)
+            data = json.loads(body)
+            self.assertTrue(data.get('valid'))
+            self.assertEqual(data.get('size_bytes'), len(valid_pdf))
+
+            # 2. Non-existent file
+            status_ne, _, body_ne = self._request('/api/staging/missing_file.pdf/validate')
+            self.assertEqual(status_ne, 400)
+            data_ne = json.loads(body_ne)
+            self.assertFalse(data_ne.get('valid'))
+        finally:
+            if staged_path.exists():
+                staged_path.unlink()
+
+    def test_archive_corrupted_staged_file_rejected(self):
+        """Verify /api/scan/archive rejects corrupted or empty staged documents with 400."""
+        corrupt_fn = f"corrupt_{int(time.time())}_شخصي.pdf"
+        staged_path = scanner_bridge.STAGING_DIR / corrupt_fn
+        # Write corrupted header (not %PDF-)
+        staged_path.write_bytes(b'NOT_A_REAL_PDF_DATA_STREAM')
+
+        try:
+            payload = {
+                'filename': corrupt_fn,
+                'section': 'شخصي',
+            }
+            status, _, body = self._request('/api/scan/archive', method='POST', data=payload)
+            self.assertEqual(status, 400)
+            data = json.loads(body)
+            self.assertIn('فشل التحقق', data.get('error', ''))
+        finally:
+            if staged_path.exists():
+                staged_path.unlink()
 
 
 if __name__ == '__main__':

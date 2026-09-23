@@ -135,12 +135,11 @@ class ImportController {
         const kb = Math.round(res.result.size_bytes / 1024);
         this.dom.fileSizeLabel.textContent = `${kb} كيلوبايت`;
 
-        // Load preview
-        const previewUrl = `http://127.0.0.1:8001${res.result.preview_url}`;
-        await this.pdfViewer.loadDocument(previewUrl);
-
         this.dom.initialControls.style.display = 'none';
         this.dom.stagedControls.style.display = 'flex';
+
+        // Load preview and validate
+        await this.loadAndValidatePreview();
       }
     } catch (err) {
       alert(`فشل استيراد الملف للمعاينة:\n${err.message}`);
@@ -149,8 +148,67 @@ class ImportController {
     }
   }
 
+  async loadAndValidatePreview() {
+    if (!this.stagedDoc) return;
+    const filename = this.stagedDoc.filename;
+
+    let isValid = false;
+    let previewData = null;
+
+    if (window.nasArchive && window.nasArchive.staging) {
+      try {
+        const localRes = await window.nasArchive.staging.read(filename);
+        if (localRes.success && localRes.base64) {
+          isValid = true;
+          previewData = localRes.base64;
+        }
+      } catch (e) {
+        console.warn('Local staging read error in import:', e);
+      }
+    }
+
+    if (!isValid) {
+      try {
+        const encName = encodeURIComponent(filename);
+        const valRes = await fetch(`http://127.0.0.1:8001/api/staging/${encName}/validate`);
+        if (valRes.ok) {
+          const valJson = await valRes.json();
+          if (valJson.valid) {
+            isValid = true;
+            previewData = `http://127.0.0.1:8001/api/staging/${encName}`;
+          }
+        }
+      } catch (httpErr) {
+        console.warn('HTTP validation error in import:', httpErr);
+      }
+    }
+
+    if (!isValid) {
+      this.dom.archiveBtn.disabled = true;
+      this.pdfViewer._showError(
+        'الملف المستورد غير متاح أو تالف. يرجى إلغاء الملف واختيار مستند صالح.',
+        () => this.loadAndValidatePreview()
+      );
+      return;
+    }
+
+    this.dom.archiveBtn.disabled = false;
+    const retryFn = () => this.loadAndValidatePreview();
+    await this.pdfViewer.loadDocument(previewData || `http://127.0.0.1:8001/api/staging/${encodeURIComponent(filename)}`, retryFn);
+  }
+
   async executeArchive() {
     if (!this.stagedDoc) return;
+
+    if (window.nasArchive && window.nasArchive.staging) {
+      try {
+        const v = await window.nasArchive.staging.validate(this.stagedDoc.filename);
+        if (!v.valid) {
+          alert(`تعذر أرشفة الملف:\n${v.error || 'الملف مفقود أو تالف'}`);
+          return;
+        }
+      } catch (e) {}
+    }
 
     this.dom.archiveBtn.disabled = true;
     this.dom.cancelBtn.disabled = true;
