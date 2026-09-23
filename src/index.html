@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' http://127.0.0.1:* http://localhost:*; img-src 'self' data: http://127.0.0.1:* http://localhost:*; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self' data:;">
+  <title>NAS Archive</title>
+  <link rel="stylesheet" href="styles/main.css">
+  <script src="js/vendor/pdf.min.js"></script>
+</head>
+<body>
+
+  <!-- Window Titlebar (macOS Style Refinement) -->
+  <header class="titlebar">
+    <div class="titlebar-left">
+      <div class="traffic-lights">
+        <button id="btnWindowClose" class="traffic-light close" title="إغلاق"></button>
+        <button id="btnWindowMin" class="traffic-light minimize" title="تصغير"></button>
+        <button id="btnWindowMax" class="traffic-light maximize" title="تكبير"></button>
+      </div>
+      <div class="app-brand" style="margin-right: 8px;">
+        <img src="../assets/icon.png" alt="NAS Archive Logo">
+        <span>NAS Archive</span>
+      </div>
+    </div>
+
+    <div class="titlebar-right">
+      <div id="topPillPaperless" class="status-pill online">
+        <span class="status-dot"></span>
+        <span>Paperless متصل</span>
+      </div>
+      <div id="topPillScanner" class="status-pill online">
+        <span class="status-dot"></span>
+        <span>EPSON WF-C5890 Series</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- App Body Layout -->
+  <div class="app-body">
+
+    <!-- Workspace Viewports (Left/Center) -->
+    <main class="workspace">
+
+      <!-- ========================================== -->
+      <!-- VIEW: SCANNER WORKSPACE                    -->
+      <!-- ========================================== -->
+      <section id="viewScanner" class="view-pane active">
+        <div class="scanner-container">
+
+          <!-- Left Controls Pane -->
+          <div class="scanner-controls-pane">
+            <div class="pane-title">
+              <svg style="width: 20px; height: 20px; color: var(--accent-primary);" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+              </svg>
+              <span>إعدادات المسح الضوئي</span>
+            </div>
+
+            <!-- Department Selector -->
+            <div>
+              <label class="field-label">1. القسم المستهدف للأرشفة والتصنيف:</label>
+              <div class="department-grid">
+                <div class="department-card selected" data-department="شخصي">
+                  <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                  <span>شخصي</span>
+                </div>
+                <div class="department-card" data-department="الرنين">
+                  <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                  <span>الرنين</span>
+                </div>
+                <div class="department-card" data-department="تناسق">
+                  <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>
+                  <span>تناسق</span>
+                </div>
+                <div class="department-card" data-department="NAS FM">
+                  <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 100-6 3 3 0 000 6z"/></svg>
+                  <span>NAS FM</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Scanner Hardware Selection -->
+            <div class="form-group">
+              <label class="field-label">2. جهاز الماسح الضوئي:</label>
+              <select id="scannerDeviceSelect" class="form-select">
+                <option value="EPSON WF-C5890 Series">EPSON WF-C5890 Series</option>
+              </select>
+            </div>
+
+            <!-- Paper Source Selection -->
+            <div class="form-group">
+              <label class="field-label">3. مصدر تلقيم الورق:</label>
+              <select id="scannerSourceSelect" class="form-select">
+                <option value="glass">مسطح الزجاج (Flatbed)</option>
+                <option value="feeder">مغذي المستندات - وجه واحد (ADF Simplex)</option>
+                <option value="duplex">مغذي المستندات - وجهين (ADF Duplex)</option>
+              </select>
+            </div>
+
+            <!-- Scan Quality & Color -->
+            <div class="form-row">
+              <div class="form-group">
+                <label class="field-label">4. نمط الألوان:</label>
+                <select id="scannerBitdepthSelect" class="form-select">
+                  <option value="color" selected>ملون (Color)</option>
+                  <option value="gray">تدرج رمادي (Grayscale)</option>
+                  <option value="bw">أبيض وأسود (Monochrome)</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="field-label">5. دقة المسح (DPI):</label>
+                <select id="scannerDpiSelect" class="form-select">
+                  <option value="150">150 DPI (سريع)</option>
+                  <option value="200">200 DPI (عادي)</option>
+                  <option value="300" selected>300 DPI (موصى به للأرشفة)</option>
+                  <option value="400">400 DPI (دقة عالية)</option>
+                  <option value="600">600 DPI (فائق الدقة)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Checkboxes -->
+            <div style="display: flex; flex-direction: column; gap: 8px; margin: 4px 0;">
+              <label class="form-checkbox">
+                <input id="scannerDeskewCheckbox" type="checkbox" checked>
+                <span>تصحيح زاوية الميلان تلقائياً (Auto-Deskew)</span>
+              </label>
+              <label class="form-checkbox">
+                <input id="scannerDuplicateCheckbox" type="checkbox">
+                <span>السماح بالأرشفة حتى لو كانت الوثيقة مكررة</span>
+              </label>
+            </div>
+
+            <!-- Action Buttons Area -->
+            <div class="action-buttons-group">
+              <!-- Initial Action: Start Scan (Stage A) -->
+              <div id="scannerInitialActions">
+                <button id="btnStartScan" class="btn-primary" style="width: 100%;">
+                  <svg style="width: 18px; height: 18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
+                  <span>بدء المسح الضوئي</span>
+                </button>
+              </div>
+
+              <!-- Two-Stage Actions: Rescan + Explicit Archive -->
+              <div id="scannerTwoStageActions" class="two-stage-buttons">
+                <button id="btnRescan" class="btn-secondary btn-rescan">
+                  <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                  <span>إعادة المسح</span>
+                </button>
+                <button id="btnArchive" class="btn-primary">
+                  <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                  <span>أرشفة الوثيقة</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Ingestion Progress Card -->
+            <div id="scannerProgressCard" class="progress-card">
+              <div class="progress-steps">
+                <div class="progress-step active" data-step="1">
+                  <div class="step-circle">1</div>
+                  <span>الاتصال</span>
+                </div>
+                <div class="progress-step" data-step="2">
+                  <div class="step-circle">2</div>
+                  <span>المسح</span>
+                </div>
+                <div class="progress-step" data-step="3">
+                  <div class="step-circle">3</div>
+                  <span>الأصل</span>
+                </div>
+                <div class="progress-step" data-step="4">
+                  <div class="step-circle">4</div>
+                  <span>الترحيل</span>
+                </div>
+                <div class="progress-step" data-step="5">
+                  <div class="step-circle">5</div>
+                  <span>الـ OCR</span>
+                </div>
+              </div>
+              <div id="scannerProgressMsg" class="progress-msg">جاري معالجة المسح الضوئي...</div>
+            </div>
+
+          </div>
+
+          <!-- Resizer Divider -->
+          <div id="scannerPaneResizer" class="pane-resizer"></div>
+
+          <!-- Right Document Preview Pane (Full Height) -->
+          <div class="document-preview-pane">
+            <!-- Preview Toolbar -->
+            <div class="preview-toolbar">
+              <div class="preview-toolbar-left">
+                <button id="btnPrevPage" class="icon-btn" title="الصفحة السابقة">
+                  <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                </button>
+                <span id="pageIndicator" class="page-indicator">0 من 0</span>
+                <button id="btnNextPage" class="icon-btn" title="الصفحة التالية">
+                  <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                </button>
+              </div>
+
+              <div class="preview-toolbar-right">
+                <button id="btnZoomOut" class="icon-btn" title="تصغير">
+                  <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg>
+                </button>
+                <span id="zoomLevel" class="zoom-level">100%</span>
+                <button id="btnZoomIn" class="icon-btn" title="تكبير">
+                  <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                </button>
+                <button id="btnFitWidth" class="icon-btn" title="ملاءمة العرض">
+                  <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/></svg>
+                </button>
+                <button id="btnRotate" class="icon-btn" title="تدوير 90 درجة">
+                  <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Viewport Canvas Container -->
+            <div id="scannerPdfViewport" class="preview-viewport">
+              <div class="preview-empty-state">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                </svg>
+                <div style="font-weight: 600; font-size: 15px;">جاهز للمعاينة الفورية</div>
+                <div style="font-size: 13px;">قم ببدء المسح الضوئي لمعاينة المستند بالكامل هنا قبل الأرشفة</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- VIEW: DOCUMENTS MANAGEMENT                 -->
+      <!-- ========================================== -->
+      <section id="viewDocuments" class="view-pane">
+        <div class="docs-header">
+          <div class="docs-toolbar">
+            <div class="search-box">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              <input id="docsSearchInput" type="text" placeholder="البحث في نص المستندات، العناوين، أو رقم القيد...">
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span id="docsCountBadge" class="status-pill online">0 وثيقة</span>
+              <div style="display: flex; background: var(--bg-surface-elevated); border-radius: var(--radius-md); padding: 2px;">
+                <button id="btnViewGrid" class="icon-btn active" title="عرض الشبكة">
+                  <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+                </button>
+                <button id="btnViewList" class="icon-btn" title="عرض القائمة">
+                  <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Department Filters -->
+          <div class="department-filter-pills">
+            <button class="filter-pill active" data-department="الكل">كافة الأقسام</button>
+            <button class="filter-pill" data-department="شخصي">شخصي</button>
+            <button class="filter-pill" data-department="الرنين">الرنين</button>
+            <button class="filter-pill" data-department="تناسق">تناسق</button>
+            <button class="filter-pill" data-department="NAS FM">NAS FM</button>
+          </div>
+        </div>
+
+        <div class="docs-content">
+          <div id="docsGrid" class="docs-grid"></div>
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- VIEW: MANUAL FILE IMPORT                   -->
+      <!-- ========================================== -->
+      <section id="viewImport" class="view-pane">
+        <div class="scanner-container">
+          <div class="scanner-controls-pane">
+            <div class="pane-title">
+              <svg style="width: 20px; height: 20px; color: var(--accent-primary);" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+              </svg>
+              <span>استيراد ملف يدوي</span>
+            </div>
+
+            <!-- Initial Import Controls -->
+            <div id="importInitialControls" style="display: flex; flex-direction: column; gap: 16px;">
+              <div>
+                <label class="field-label">1. القسم المستهدف للأرشفة:</label>
+                <div id="importDeptGrid" class="department-grid">
+                  <div class="department-card selected" data-department="شخصي"><span>شخصي</span></div>
+                  <div class="department-card" data-department="الرنين"><span>الرنين</span></div>
+                  <div class="department-card" data-department="تناسق"><span>تناسق</span></div>
+                  <div class="department-card" data-department="NAS FM"><span>NAS FM</span></div>
+                </div>
+              </div>
+
+              <div>
+                <label class="field-label">2. اختيار أو سحب الملف:</label>
+                <div id="importDropzone" class="dropzone">
+                  <svg style="width: 44px; height: 44px; color: var(--accent-primary);" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                  <div style="font-weight: 600; font-size: 14px;">اسحب الملف وأفلته هنا</div>
+                  <div style="font-size: 12px; color: var(--text-muted);">يدعم صيغ PDF، PNG، JPG، TIFF</div>
+                  <button id="btnBrowseFile" type="button" class="btn-secondary" style="margin-top: 8px;">استعراض من الحاسوب</button>
+                  <input id="importFileInput" type="file" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff" style="display: none;">
+                </div>
+              </div>
+            </div>
+
+            <!-- Staged File Controls (Stage B) -->
+            <div id="importStagedControls" style="display: none; flex-direction: column; gap: 16px;">
+              <div style="background: var(--bg-surface-elevated); padding: 14px; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+                <div style="font-size: 11px; color: var(--text-muted);">الملف الجاهز للمعاينة:</div>
+                <div id="importFileNameLabel" style="font-weight: 700; font-size: 13px; margin: 4px 0;" class="ltr">doc.pdf</div>
+                <div id="importFileSizeLabel" style="font-size: 11px; color: var(--text-secondary);">—</div>
+              </div>
+
+              <label class="form-checkbox">
+                <input id="importDuplicateCheckbox" type="checkbox">
+                <span>السماح بالأرشفة حتى لو كانت الوثيقة مكررة</span>
+              </label>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <button id="btnCancelImport" class="btn-secondary" style="color: #ef4444;">إلغاء</button>
+                <button id="btnArchiveImport" class="btn-primary">أرشفة الوثيقة</button>
+              </div>
+            </div>
+
+            <!-- Progress card -->
+            <div id="importProgressCard" class="progress-card">
+              <div id="importProgressMsg" class="progress-msg">جاري معالجة الملف...</div>
+            </div>
+
+          </div>
+
+          <!-- Preview on Right -->
+          <div class="document-preview-pane">
+            <div class="preview-toolbar">
+              <div class="preview-toolbar-left">
+                <button id="importBtnPrev" class="icon-btn" title="السابق"><svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg></button>
+                <span id="importPageIndicator" class="page-indicator">0 من 0</span>
+                <button id="importBtnNext" class="icon-btn" title="التالي"><svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg></button>
+              </div>
+              <div class="preview-toolbar-right">
+                <button id="importBtnZoomOut" class="icon-btn"><svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg></button>
+                <button id="importBtnZoomIn" class="icon-btn"><svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg></button>
+                <button id="importBtnRotate" class="icon-btn"><svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg></button>
+              </div>
+            </div>
+            <div id="importPdfViewport" class="preview-viewport">
+              <div class="preview-empty-state">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                <div style="font-weight: 600; font-size: 15px;">جاهز لمعاينة الملف</div>
+                <div style="font-size: 13px;">اختر ملفاً لعرضه هنا قبل الأرشفة</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- VIEW: OPERATIONAL DASHBOARD                -->
+      <!-- ========================================== -->
+      <section id="viewDashboard" class="view-pane">
+        <div class="dashboard-container">
+          <div class="pane-title">لوحة التحكم والمؤشرات التشغيلية</div>
+
+          <!-- Stats Grid -->
+          <div class="stats-grid">
+            <div class="stat-card">
+              <span class="stat-card-title">إجمالي الوثائق المؤرشفة</span>
+              <span id="dashTotalDocs" class="stat-card-value">0</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-card-title">وثائق بانتظار المراجعة</span>
+              <span id="dashPendingDocs" class="stat-card-value" style="color: #f59e0b;">0</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-card-title">وثائق قسم شخصي</span>
+              <span id="dashDeptPersonal" class="stat-card-value">0</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-card-title">وثائق قسم الرنين</span>
+              <span id="dashDeptRaneen" class="stat-card-value">0</span>
+            </div>
+          </div>
+
+          <!-- Services Health Overview -->
+          <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 18px;">
+            <div style="font-weight: 700; font-size: 14px; margin-bottom: 14px;">حالة الخدمات المساعدة</div>
+            <div style="display: flex; gap: 14px; flex-wrap: wrap;">
+              <div id="dashHealthPaperless" class="status-pill online"><span class="status-dot"></span><span>Paperless متصل</span></div>
+              <div id="dashHealthScanner" class="status-pill online"><span class="status-dot"></span><span>EPSON WF-C5890 Series</span></div>
+            </div>
+          </div>
+
+          <!-- Recent Documents -->
+          <div>
+            <div style="font-weight: 700; font-size: 14px; margin-bottom: 12px;">أحدث الوثائق المؤرشفة</div>
+            <div id="dashRecentDocsList" style="display: flex; flex-direction: column; gap: 10px;"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- VIEW: SETTINGS & ADMINISTRATION            -->
+      <!-- ========================================== -->
+      <section id="viewSettings" class="view-pane">
+        <div class="dashboard-container" style="max-width: 800px;">
+          <div class="pane-title">الإعدادات وإدارة النظام</div>
+
+          <!-- Preferences -->
+          <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 20px; display: flex; flex-direction: column; gap: 14px;">
+            <div style="font-weight: 700; font-size: 14px;">تفضيلات واجهة المستخدم والمسح</div>
+            
+            <div class="form-row">
+              <div class="form-group">
+                <label class="field-label">مظهر التطبيق:</label>
+                <select id="settingThemeSelect" class="form-select">
+                  <option value="dark">الوضع الداكن (Dark Mode)</option>
+                  <option value="light">الوضع الفاتح (Light Mode)</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="field-label">القسم الافتراضي:</label>
+                <select id="settingDefaultDept" class="form-select">
+                  <option value="شخصي">شخصي</option>
+                  <option value="الرنين">الرنين</option>
+                  <option value="تناسق">تناسق</option>
+                  <option value="NAS FM">NAS FM</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Services Diagnostics -->
+          <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 20px; display: flex; flex-direction: column; gap: 14px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <div style="font-weight: 700; font-size: 14px;">تشخيص الخدمات والربط المحلي</div>
+              <button id="btnRefreshServices" class="btn-secondary" style="padding: 6px 12px; font-size: 12px;">إعادة الفحص</button>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: var(--bg-surface-elevated); border-radius: 8px;">
+                <span style="font-size: 13px;">محرك Docker Desktop:</span>
+                <span id="statusDocker" class="status-pill online"><span class="status-dot"></span><span>يعمل</span></span>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: var(--bg-surface-elevated); border-radius: 8px;">
+                <span style="font-size: 13px;">Paperless-ngx Core:</span>
+                <span id="statusPaperless" class="status-pill online"><span class="status-dot"></span><span>جاهز</span></span>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: var(--bg-surface-elevated); border-radius: 8px;">
+                <span style="font-size: 13px;">Scanner Bridge (127.0.0.1:8001):</span>
+                <span id="statusBridge" class="status-pill online"><span class="status-dot"></span><span>متصل</span></span>
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: var(--bg-surface-elevated); border-radius: 8px;">
+                <span style="font-size: 13px;">الماسح الضوئي (WIA):</span>
+                <span id="statusScanner" class="status-pill online"><span class="status-dot"></span><span>EPSON WF-C5890</span></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Backup & Restore -->
+          <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 20px; display: flex; flex-direction: column; gap: 14px;">
+            <div style="font-weight: 700; font-size: 14px;">النسخ الاحتياطي واستعادة البيانات</div>
+            <div style="font-size: 12px; color: var(--text-secondary);">
+              يتم حفظ النسخ الاحتياطية في المجلد الآمن <span class="ltr">runtime/export/</span> مع حماية كاملة للمستندات الأصلية.
+            </div>
+            <div>
+              <button id="btnCreateBackup" class="btn-primary" style="padding: 9px 16px; font-size: 13px;">إنشاء نسخة احتياطية فورية</button>
+              <div id="backupStatusMsg" style="margin-top: 8px; font-size: 12px;"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Sidebar Navigation on Right (RTL) -->
+    <aside class="sidebar">
+      <div class="nav-group">
+        <a href="#" class="nav-item" data-view="dashboard">
+          <div class="nav-item-content">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+            <span>لوحة التحكم</span>
+          </div>
+        </a>
+
+        <a href="#" class="nav-item active" data-view="scanner">
+          <div class="nav-item-content">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            <span>مسح ضوئي</span>
+          </div>
+        </a>
+
+        <a href="#" class="nav-item" data-view="documents">
+          <div class="nav-item-content">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+            <span>المستندات</span>
+          </div>
+        </a>
+
+        <a href="#" class="nav-item" data-view="import">
+          <div class="nav-item-content">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+            <span>استيراد ملف</span>
+          </div>
+        </a>
+
+        <a href="#" class="nav-item" data-view="documents" onclick="if(window.documentsController){window.documentsController.currentDepartment='الكل';window.documentsController.searchQuery='بانتظار المراجعة';window.documentsController.fetchDocuments();}">
+          <div class="nav-item-content">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+            <span>بانتظار المراجعة</span>
+          </div>
+          <span id="badgePendingReview" class="badge" style="display: none;">0</span>
+        </a>
+      </div>
+
+      <div class="nav-group">
+        <a href="#" class="nav-item" data-view="settings">
+          <div class="nav-item-content">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            <span>الإعدادات</span>
+          </div>
+        </a>
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- Document Detail Modal / Drawer -->
+  <div id="docDetailModal" class="modal-overlay">
+    <div class="modal-content">
+      <!-- PDF View Side -->
+      <div class="modal-preview-half">
+        <div class="preview-toolbar">
+          <div class="preview-toolbar-left">
+            <button id="modalBtnPrev" class="icon-btn"><svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg></button>
+            <span id="modalPageIndicator" class="page-indicator">1 من 1</span>
+            <button id="modalBtnNext" class="icon-btn"><svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg></button>
+          </div>
+          <div class="preview-toolbar-right">
+            <button id="modalBtnZoomOut" class="icon-btn"><svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/></svg></button>
+            <button id="modalBtnZoomIn" class="icon-btn"><svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg></button>
+            <button id="modalBtnRotate" class="icon-btn"><svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg></button>
+          </div>
+        </div>
+        <div id="modalPdfViewport" class="preview-viewport" style="height: calc(100% - 44px);"></div>
+      </div>
+
+      <!-- Metadata Edit Side -->
+      <div class="modal-edit-half">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 12px;">
+          <div id="modalDocTitle" style="font-weight: 700; font-size: 15px; color: var(--text-primary);">تفاصيل المستند</div>
+          <button id="modalCloseBtn" class="icon-btn" title="إغلاق">
+            <svg style="width: 18px; height: 18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+
+        <div class="form-group">
+          <label class="field-label">عنوان المستند:</label>
+          <input id="editDocTitle" type="text" class="form-input">
+        </div>
+
+        <div class="form-group">
+          <label class="field-label">القسم:</label>
+          <div id="editDocDeptTags" style="display: flex; gap: 8px; flex-wrap: wrap;"></div>
+        </div>
+
+        <div class="form-group">
+          <label class="field-label">نوع المستند:</label>
+          <select id="editDocType" class="form-select"></select>
+        </div>
+
+        <!-- Custom Fields -->
+        <div id="editDocCustomFields" style="display: flex; flex-direction: column; gap: 12px;"></div>
+
+        <!-- OCR Content Snippet -->
+        <div class="form-group">
+          <label class="field-label">النص المستخرج (OCR):</label>
+          <div id="modalOcrContent" style="max-height: 120px; overflow-y: auto; background: var(--bg-surface-elevated); padding: 10px; border-radius: var(--radius-md); font-size: 12px; color: var(--text-secondary); line-height: 1.6; user-select: text;"></div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div style="display: flex; gap: 10px; margin-top: auto; padding-top: 14px; border-top: 1px solid var(--border-subtle); flex-wrap: wrap;">
+          <button id="modalSaveBtn" class="btn-primary" style="flex: 1;">حفظ التعديلات</button>
+          <button id="modalApproveBtn" class="btn-secondary" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border-color: rgba(16, 185, 129, 0.3);">اعتماد الوثيقة</button>
+          <button id="modalDownloadBtn" class="btn-secondary">تحميل الأصل</button>
+          <button id="modalDeleteBtn" class="btn-secondary" style="color: #ef4444;">حذف</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/api.js"></script>
+  <script src="js/pdf_viewer.js"></script>
+  <script src="js/scanner.js"></script>
+  <script src="js/documents.js"></script>
+  <script src="js/import.js"></script>
+  <script src="js/dashboard.js"></script>
+  <script src="js/settings.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,52 @@
+{
+  "name": "nas-archive",
+  "version": "1.2.0",
+  "description": "NAS Archive — نظام الأرشفة الذكي والمسح الضوئي المكتبي المتكامل",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --dir",
+    "dist": "electron-builder --win nsis"
+  },
+  "author": "NAS CodeWorks",
+  "license": "UNLICENSED",
+  "build": {
+    "appId": "com.nasarchive.desktop",
+    "productName": "NAS Archive",
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "assets/Dev-printer.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "NAS Archive",
+      "installerIcon": "assets/Dev-printer.ico",
+      "uninstallerIcon": "assets/Dev-printer.ico",
+      "uninstallDisplayName": "NAS Archive",
+      "runAfterFinish": true
+    },
+    "files": [
+      "electron/**/*",
+      "src/**/*",
+      "assets/**/*",
+      "scripts/**/*",
+      "compose.yaml"
+    ]
+  },
+  "devDependencies": {
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3"
+  },
+  "dependencies": {
+    "pdfjs-dist": "^3.11.174"
+  }
+}

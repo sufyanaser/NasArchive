@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NAS Archive — بدء التشغيل</title>
+  <style>
+    @font-face {
+      font-family: 'IBM Plex Sans Arabic';
+      font-weight: 400;
+      src: url('styles/fonts/IBMPlexSansArabic-400.woff2') format('woff2');
+    }
+    @font-face {
+      font-family: 'IBM Plex Sans Arabic';
+      font-weight: 600;
+      src: url('styles/fonts/IBMPlexSansArabic-600.woff2') format('woff2');
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-drag: none;
+    }
+
+    body {
+      font-family: 'IBM Plex Sans Arabic', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: transparent;
+      height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .splash-card {
+      width: 440px;
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 20px;
+      padding: 32px 28px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+      text-align: center;
+      color: #f8fafc;
+      position: relative;
+    }
+
+    .icon-container {
+      width: 72px;
+      height: 72px;
+      margin: 0 auto 16px;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      border-radius: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 24px rgba(16, 185, 129, 0.2);
+    }
+
+    .icon-container img {
+      width: 48px;
+      height: 48px;
+      object-fit: contain;
+    }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 4px;
+      color: #ffffff;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-bottom: 24px;
+    }
+
+    .progress-bar-container {
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 9999px;
+      overflow: hidden;
+      margin-bottom: 18px;
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 15%;
+      background: linear-gradient(90deg, #10b981, #34d399);
+      border-radius: 9999px;
+      transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .status-text {
+      font-size: 14px;
+      font-weight: 600;
+      color: #e2e8f0;
+      margin-bottom: 4px;
+      min-height: 22px;
+    }
+
+    .detail-text {
+      font-size: 12px;
+      color: #64748b;
+      min-height: 18px;
+    }
+
+    .error-box {
+      display: none;
+      margin-top: 14px;
+      padding: 10px;
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      border-radius: 10px;
+      font-size: 12px;
+      color: #fca5a5;
+    }
+
+    .retry-btn {
+      display: none;
+      margin-top: 12px;
+      padding: 8px 18px;
+      background: #10b981;
+      color: #ffffff;
+      border: none;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.2s;
+    }
+    .retry-btn:hover {
+      background: #059669;
+    }
+  </style>
+</head>
+<body>
+  <div class="splash-card">
+    <div class="icon-container">
+      <img src="../assets/icon.png" alt="NAS Archive Logo">
+    </div>
+    <h1>NAS Archive</h1>
+    <div class="subtitle">نظام الأرشفة الذكي والمسح الضوئي المكتبي</div>
+
+    <div class="progress-bar-container">
+      <div id="progressBar" class="progress-bar"></div>
+    </div>
+
+    <div id="statusTitle" class="status-text">جاري تحضير مساحة العمل...</div>
+    <div id="statusDetail" class="detail-text">فحص بيئة الخدمات وتجهيز النظام</div>
+
+    <div id="errorBox" class="error-box"></div>
+    <button id="retryBtn" class="retry-btn" onclick="retryStartup()">إعادة المحاولة</button>
+  </div>
+
+  <script>
+    const bar = document.getElementById('progressBar');
+    const title = document.getElementById('statusTitle');
+    const detail = document.getElementById('statusDetail');
+    const errorBox = document.getElementById('errorBox');
+    const retryBtn = document.getElementById('retryBtn');
+
+    if (window.nasArchive && window.nasArchive.services) {
+      window.nasArchive.services.onStartupProgress((data) => {
+        const step = data.step || 1;
+        const total = data.totalSteps || 5;
+        const percent = Math.min(100, Math.round((step / total) * 100));
+
+        bar.style.width = percent + '%';
+        if (data.title) title.textContent = data.title;
+        if (data.subtitle) detail.textContent = data.subtitle;
+
+        if (data.error) {
+          bar.style.background = '#ef4444';
+          errorBox.textContent = data.subtitle || 'حدث خطأ أثناء بدء التشغيل.';
+          errorBox.style.display = 'block';
+          retryBtn.style.display = 'inline-block';
+        } else {
+          errorBox.style.display = 'none';
+          retryBtn.style.display = 'none';
+          bar.style.background = 'linear-gradient(90deg, #10b981, #34d399)';
+        }
+      });
+    }
+
+    function retryStartup() {
+      errorBox.style.display = 'none';
+      retryBtn.style.display = 'none';
+      bar.style.background = 'linear-gradient(90deg, #10b981, #34d399)';
+      bar.style.width = '20%';
+      title.textContent = 'جاري إعادة فحص الخدمات...';
+      if (window.nasArchive && window.nasArchive.services) {
+        window.nasArchive.services.retryStartup();
+      }
+    }
+  </script>
+</body>
+</html>

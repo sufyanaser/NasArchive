@@ -219,13 +219,13 @@ def poll_paperless_consumption(target_filename: str, timeout_seconds: int = 120)
 
 
 def background_task_worker(task_id: str, task_type: str, params: Dict[str, Any]):
-    """Execute scan or file import in a background worker thread."""
+    """Execute scan, staging, archive, or file import in a background worker thread."""
     section = params.get('section', 'شخصي')
     allow_duplicate = params.get('allow_duplicate', False)
 
     try:
-        if task_type == 'scan':
-            # Step 1: Connecting to scanner
+        if task_type == 'scan_stage':
+            # Stage A: Scan to temporary staging for preview without ingesting to Paperless
             with TASKS_LOCK:
                 TASKS[task_id].update({
                     'status': 'CONNECTING_SCANNER',
@@ -240,7 +240,63 @@ def background_task_worker(task_id: str, task_type: str, params: Dict[str, Any])
             dpi = params.get('dpi', 300)
             deskew = params.get('deskew', True)
 
-            # Step 2: Scanning
+            with TASKS_LOCK:
+                TASKS[task_id].update({
+                    'status': 'SCANNING',
+                    'step': 2,
+                    'message': 'جاري سحب ومسح المستند ضوئياً بدقة عالية للمعاينة...',
+                })
+
+            timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
+            filename = f"scan_{timestamp}_{section}.pdf"
+
+            staged_res = scanner_ingest.scan_to_staging(
+                section=section,
+                device=device,
+                driver=driver,
+                dpi=dpi,
+                source=source,
+                bitdepth=bitdepth,
+                deskew=deskew,
+                output_filename=filename
+            )
+
+            result_payload = {
+                'stage_id': task_id,
+                'staging_path': staged_res['staging_path'],
+                'filename': staged_res['filename'],
+                'size_bytes': staged_res['size_bytes'],
+                'sha256': staged_res['sha256'],
+                'pages_count': staged_res.get('pages_count', 1),
+                'section': section,
+                'preview_url': f"/api/staging/{staged_res['filename']}",
+            }
+
+            with TASKS_LOCK:
+                TASKS[task_id].update({
+                    'status': 'STAGED_READY',
+                    'step': 2,
+                    'message': 'تم مسح المستند بنجاح وجاهز للمعاينة والمراجعة قبل الأرشفة.',
+                    'result': result_payload,
+                })
+            return
+
+        elif task_type == 'scan':
+            # Legacy/Direct: Connect, scan, and archive immediately
+            with TASKS_LOCK:
+                TASKS[task_id].update({
+                    'status': 'CONNECTING_SCANNER',
+                    'step': 1,
+                    'message': 'جاري الاتصال بالماسح الضوئي والتأكد من الجاهزية...',
+                })
+
+            device = params.get('device')
+            driver = params.get('driver', 'wia')
+            source = params.get('source')
+            bitdepth = params.get('bitdepth', 'color')
+            dpi = params.get('dpi', 300)
+            deskew = params.get('deskew', True)
+
             with TASKS_LOCK:
                 TASKS[task_id].update({
                     'status': 'SCANNING',
@@ -253,7 +309,6 @@ def background_task_worker(task_id: str, task_type: str, params: Dict[str, Any])
             staging_path = STAGING_DIR / filename
             STAGING_DIR.mkdir(parents=True, exist_ok=True)
 
-            # Execute scan via NAPS2
             ingest_res = scanner_ingest.scan_document(
                 section=section,
                 device=device,
@@ -266,7 +321,7 @@ def background_task_worker(task_id: str, task_type: str, params: Dict[str, Any])
             )
 
         elif task_type == 'import':
-            # Step 1: Preparing file
+            # Direct file import & archive
             with TASKS_LOCK:
                 TASKS[task_id].update({
                     'status': 'PREPARING_FILE',
@@ -277,7 +332,28 @@ def background_task_worker(task_id: str, task_type: str, params: Dict[str, Any])
             staging_path = Path(params['staging_file'])
             filename = staging_path.name
 
-            # Ingest file
+            ingest_res = scanner_ingest.ingest_file(
+                staging_path,
+                section=section,
+                allow_duplicate=allow_duplicate
+            )
+
+        elif task_type == 'archive':
+            # Stage B: Explicit archive of an already staged document
+            raw_filename = params.get('filename') or params.get('staging_file') or ''
+            safe_name = sanitize_filename(raw_filename)
+            staging_path = STAGING_DIR / safe_name
+            if not staging_path.exists():
+                raise FileNotFoundError(f'الملف المؤقت غير موجود: {safe_name}')
+
+            filename = staging_path.name
+            with TASKS_LOCK:
+                TASKS[task_id].update({
+                    'status': 'ARCHIVING',
+                    'step': 3,
+                    'message': 'جاري حفظ النسخة الخام وفحص البصمة الرقمية (SHA-256)...',
+                })
+
             ingest_res = scanner_ingest.ingest_file(
                 staging_path,
                 section=section,
@@ -397,7 +473,7 @@ class ScannerBridgeHandler(BaseHTTPRequestHandler):
     def send_cors_and_security_headers(self):
         """Send local security and CORS headers."""
         self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.send_header('X-Frame-Options', 'SAMEORIGIN')
@@ -455,7 +531,7 @@ class ScannerBridgeHandler(BaseHTTPRequestHandler):
                     'default_driver': 'wia',
                     'detected_devices': detected,
                 },
-                'version': '1.1.0'
+                'version': '1.2.0'
             })
             return
 
@@ -514,6 +590,55 @@ class ScannerBridgeHandler(BaseHTTPRequestHandler):
             self.send_json(200, tasks_list[:25])
             return
 
+        # API: Staged Document Preview
+        if path.startswith('/api/staging/'):
+            raw_filename = path[len('/api/staging/'):]
+            safe_name = sanitize_filename(raw_filename)
+            target_path = STAGING_DIR / safe_name
+            if not target_path.exists() or not target_path.is_file():
+                self.send_json(404, {'error': 'Staged document not found'})
+                return
+
+            ext = target_path.suffix.lower()
+            mime = 'application/pdf'
+            if ext in ('.jpg', '.jpeg'):
+                mime = 'image/jpeg'
+            elif ext == '.png':
+                mime = 'image/png'
+            elif ext in ('.tif', '.tiff'):
+                mime = 'image/tiff'
+
+            file_bytes = target_path.read_bytes()
+            self.send_response(200)
+            self.send_header('Content-Type', mime)
+            self.send_header('Content-Length', str(len(file_bytes)))
+            self.send_header('Accept-Ranges', 'bytes')
+            self.send_header('Content-Disposition', f'inline; filename="{safe_name}"')
+            self.send_cors_and_security_headers()
+            self.end_headers()
+            self.wfile.write(file_bytes)
+            return
+
+        self.send_json(404, {'error': 'Endpoint not found'})
+
+    def do_DELETE(self):
+        """Handle DELETE requests for discarding staged files."""
+        parsed = urlparse(self.path)
+        path = parsed.path.rstrip('/')
+        if path.startswith('/api/staging/'):
+            raw_filename = path[len('/api/staging/'):]
+            safe_name = sanitize_filename(raw_filename)
+            target_path = STAGING_DIR / safe_name
+            if target_path.exists() and target_path.is_file():
+                try:
+                    target_path.unlink()
+                    self.send_json(200, {'status': 'DISCARDED', 'filename': safe_name})
+                    return
+                except Exception as exc:
+                    self.send_json(500, {'error': f'Failed to discard staged file: {exc}'})
+                    return
+            self.send_json(404, {'error': 'Staged document not found'})
+            return
         self.send_json(404, {'error': 'Endpoint not found'})
 
     def do_POST(self):
@@ -524,8 +649,8 @@ class ScannerBridgeHandler(BaseHTTPRequestHandler):
         content_length = int(self.headers.get('Content-Length', 0))
         content_type = self.headers.get('Content-Type', '')
 
-        # API: Scan Document
-        if path == '/api/scan':
+        # API: Scan Document (supports stage_only or full scan)
+        if path in ('/api/scan', '/api/scan/stage'):
             if content_length == 0 or 'application/json' not in content_type:
                 self.send_json(400, {'error': 'Expected application/json body'})
                 return
@@ -568,14 +693,19 @@ class ScannerBridgeHandler(BaseHTTPRequestHandler):
                 self.send_json(400, {'error': 'Device name contains illegal shell characters.'})
                 return
 
-            task_id = f"scan_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{os.urandom(3).hex()}"
+            is_stage_only = (path == '/api/scan/stage') or bool(data.get('stage_only', False))
+            task_type = 'scan_stage' if is_stage_only else 'scan'
+            total_steps = 2 if is_stage_only else 5
+            initial_msg = 'تم تسجيل طلب المسح المبدئي للمعاينة...' if is_stage_only else 'تم تسجيل طلب المسح، بانتظار بدء المعالجة...'
+
+            task_id = f"{task_type}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{os.urandom(3).hex()}"
             task_entry = {
                 'task_id': task_id,
-                'type': 'scan',
+                'type': task_type,
                 'status': 'QUEUED',
                 'step': 1,
-                'total_steps': 5,
-                'message': 'تم تسجيل طلب المسح، بانتظار بدء المعالجة...',
+                'total_steps': total_steps,
+                'message': initial_msg,
                 'section': section,
                 'created_at': datetime.now(timezone.utc).isoformat(),
                 'result': None,
@@ -587,14 +717,169 @@ class ScannerBridgeHandler(BaseHTTPRequestHandler):
             # Start worker thread
             threading.Thread(
                 target=background_task_worker,
-                args=(task_id, 'scan', data),
+                args=(task_id, task_type, data),
                 daemon=True
             ).start()
 
             self.send_json(202, {'status': 'QUEUED', 'task_id': task_id})
             return
 
-        # API: Import File
+        # API: Archive Staged Document
+        if path in ('/api/scan/archive', '/api/archive'):
+            if content_length == 0 or 'application/json' not in content_type:
+                self.send_json(400, {'error': 'Expected application/json body'})
+                return
+
+            body = self.rfile.read(content_length).decode('utf-8')
+            try:
+                data = json.loads(body)
+            except json.JSONDecodeError:
+                self.send_json(400, {'error': 'Invalid JSON format'})
+                return
+
+            raw_filename = data.get('filename') or data.get('staging_file')
+            if not raw_filename:
+                self.send_json(400, {'error': 'Missing filename or staging_file to archive'})
+                return
+
+            safe_name = sanitize_filename(raw_filename)
+            staging_file = STAGING_DIR / safe_name
+            if not staging_file.exists():
+                self.send_json(404, {'error': f'Staged file not found: {safe_name}'})
+                return
+
+            section = data.get('section', 'شخصي')
+            if section not in scanner_ingest.VALID_SECTIONS:
+                self.send_json(400, {'error': f'Invalid section. Must be one of: {scanner_ingest.VALID_SECTIONS}'})
+                return
+
+            task_id = f"archive_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{os.urandom(3).hex()}"
+            task_entry = {
+                'task_id': task_id,
+                'type': 'archive',
+                'status': 'QUEUED',
+                'step': 3,
+                'total_steps': 5,
+                'message': 'تم تسجيل طلب الأرشفة، جاري المعالجة...',
+                'section': section,
+                'created_at': datetime.now(timezone.utc).isoformat(),
+                'result': None,
+                'error': None,
+            }
+            with TASKS_LOCK:
+                TASKS[task_id] = task_entry
+
+            worker_params = {
+                'filename': safe_name,
+                'section': section,
+                'allow_duplicate': bool(data.get('allow_duplicate', False)),
+            }
+
+            threading.Thread(
+                target=background_task_worker,
+                args=(task_id, 'archive', worker_params),
+                daemon=True
+            ).start()
+
+            self.send_json(202, {'status': 'QUEUED', 'task_id': task_id})
+            return
+
+        # API: Import File to Staging Only (Stage A)
+        if path == '/api/import/stage':
+            if content_length == 0 or 'application/json' not in content_type:
+                self.send_json(400, {'error': 'Expected application/json with base64 payload'})
+                return
+
+            body = self.rfile.read(content_length).decode('utf-8')
+            try:
+                data = json.loads(body)
+            except json.JSONDecodeError:
+                self.send_json(400, {'error': 'Invalid JSON format'})
+                return
+
+            raw_filename = data.get('filename', '')
+            section = data.get('section', 'شخصي')
+            file_data_b64 = data.get('file_data', '')
+
+            if not raw_filename or file_data_b64 is None:
+                self.send_json(400, {'error': 'Missing filename or file_data'})
+                return
+
+            if file_data_b64 == '':
+                self.send_json(400, {'error': 'File is empty (0 bytes)'})
+                return
+
+            if section not in scanner_ingest.VALID_SECTIONS:
+                self.send_json(400, {'error': f'Invalid section. Must be one of: {scanner_ingest.VALID_SECTIONS}'})
+                return
+
+            safe_name = sanitize_filename(raw_filename)
+            ext = Path(safe_name).suffix.lower()
+            if ext not in scanner_ingest.SUPPORTED_EXTENSIONS:
+                self.send_json(400, {'error': f'Unsupported file format "{ext}". Must be one of: {list(scanner_ingest.SUPPORTED_EXTENSIONS.keys())}'})
+                return
+
+            try:
+                file_bytes = base64.b64decode(file_data_b64)
+            except Exception:
+                self.send_json(400, {'error': 'Invalid base64 encoding'})
+                return
+
+            if len(file_bytes) == 0:
+                self.send_json(400, {'error': 'File is empty (0 bytes)'})
+                return
+
+            # Check header
+            valid_headers = scanner_ingest.SUPPORTED_EXTENSIONS[ext]
+            if not any(file_bytes.startswith(hdr) for hdr in valid_headers):
+                self.send_json(400, {'error': f'File format error: {ext} lacks valid signature header.'})
+                return
+
+            STAGING_DIR.mkdir(parents=True, exist_ok=True)
+            timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
+            staged_filename = f"{timestamp}_{safe_name}"
+            staging_file = STAGING_DIR / staged_filename
+            staging_file.write_bytes(file_bytes)
+
+            pages_count = 1
+            if ext == '.pdf':
+                try:
+                    pages_count = max(1, len(re.findall(rb'/Type\s*/Page\b', file_bytes)))
+                except Exception:
+                    pass
+
+            sha256_hash = scanner_ingest.compute_file_hash(staging_file)
+            task_id = f"stage_import_{timestamp}_{os.urandom(3).hex()}"
+            result_payload = {
+                'stage_id': task_id,
+                'staging_path': str(staging_file),
+                'filename': staged_filename,
+                'size_bytes': len(file_bytes),
+                'sha256': sha256_hash,
+                'pages_count': pages_count,
+                'section': section,
+                'preview_url': f"/api/staging/{staged_filename}",
+            }
+
+            task_entry = {
+                'task_id': task_id,
+                'type': 'import_stage',
+                'status': 'STAGED_READY',
+                'step': 2,
+                'total_steps': 2,
+                'message': 'تم استلام الملف وجاهز للمعاينة والمراجعة قبل الأرشفة.',
+                'section': section,
+                'created_at': datetime.now(timezone.utc).isoformat(),
+                'result': result_payload,
+                'error': None,
+            }
+            with TASKS_LOCK:
+                TASKS[task_id] = task_entry
+
+            self.send_json(202, {'status': 'STAGED_READY', 'task_id': task_id, 'result': result_payload})
+            return
+
+        # API: Import File (Legacy/Direct full import)
         if path == '/api/import':
             if content_length == 0 or 'application/json' not in content_type:
                 self.send_json(400, {'error': 'Expected application/json with base64 payload'})

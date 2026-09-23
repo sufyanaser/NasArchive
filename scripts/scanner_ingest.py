@@ -173,7 +173,7 @@ def ingest_file(
     }
 
 
-def scan_document(
+def scan_to_staging(
     section: str,
     device: Optional[str] = None,
     driver: str = 'wia',
@@ -185,7 +185,7 @@ def scan_document(
     deskew: bool = True,
     output_filename: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Execute scan using NAPS2 CLI and pipe output into the ingestion pipeline."""
+    """Execute scan using NAPS2 CLI and save output to temporary staging for preview without ingesting."""
     naps2 = find_naps2_executable()
     if not naps2:
         raise RuntimeError('NAPS2.Console.exe is not installed or not in PATH.')
@@ -193,9 +193,12 @@ def scan_document(
     if source and source not in VALID_SOURCES:
         raise ValueError(f'Invalid source "{source}". Must be one of: {VALID_SOURCES}')
 
+    if section not in VALID_SECTIONS:
+        raise ValueError(f'Invalid section "{section}". Must be one of: {VALID_SECTIONS}')
+
     STAGING_DIR.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
-    filename = output_filename or f'scan_{timestamp}.pdf'
+    filename = output_filename or f'scan_{timestamp}_{section}.pdf'
     staging_output = STAGING_DIR / filename
 
     cmd = [
@@ -227,8 +230,58 @@ def scan_document(
     if not staging_output.exists() or staging_output.stat().st_size == 0:
         raise RuntimeError('Scanning completed but no output file was created.')
 
+    sha256_hash = compute_file_hash(staging_output)
+
+    # Count pages if PDF
+    pages_count = 1
+    try:
+        content = staging_output.read_bytes()
+        pages_count = max(1, len(re.findall(rb'/Type\s*/Page\b', content)))
+    except Exception:
+        pass
+
+    return {
+        'status': 'STAGED',
+        'staging_path': str(staging_output),
+        'filename': staging_output.name,
+        'size_bytes': staging_output.stat().st_size,
+        'sha256': sha256_hash,
+        'pages_count': pages_count,
+        'section': section,
+    }
+
+
+def scan_document(
+    section: str,
+    device: Optional[str] = None,
+    driver: str = 'wia',
+    dpi: int = 300,
+    page_size: str = 'a4',
+    bitdepth: str = 'color',
+    source: Optional[str] = None,
+    multipage: bool = True,
+    deskew: bool = True,
+    output_filename: Optional[str] = None,
+    stage_only: bool = False,
+) -> Dict[str, Any]:
+    """Execute scan using NAPS2 CLI and pipe output into the ingestion pipeline or return staged result."""
+    staged = scan_to_staging(
+        section=section,
+        device=device,
+        driver=driver,
+        dpi=dpi,
+        page_size=page_size,
+        bitdepth=bitdepth,
+        source=source,
+        multipage=multipage,
+        deskew=deskew,
+        output_filename=output_filename,
+    )
+    if stage_only:
+        return staged
+
     # Ingest scanned output into target section
-    return ingest_file(staging_output, section=section)
+    return ingest_file(Path(staged['staging_path']), section=section)
 
 
 def main():

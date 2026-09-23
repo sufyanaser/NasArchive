@@ -192,6 +192,48 @@ class ScannerBridgeTests(unittest.TestCase):
         self.assertEqual(task_data.get('task_id'), task_id)
         self.assertEqual(task_data.get('type'), 'import')
 
+    def test_import_stage_endpoint(self):
+        """Verify /api/import/stage saves file to staging for preview without immediate archiving."""
+        valid_pdf_content = b'%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n'
+        payload = {
+            'filename': 'stage_test.pdf',
+            'section': 'الرنين',
+            'file_data': base64.b64encode(valid_pdf_content).decode('ascii'),
+        }
+        status, _, body = self._request('/api/import/stage', method='POST', data=payload)
+        self.assertEqual(status, 202)
+        data = json.loads(body)
+        self.assertEqual(data.get('status'), 'STAGED_READY')
+        self.assertIn('result', data)
+        self.assertEqual(data['result']['section'], 'الرنين')
+        staged_fn = data['result']['filename']
+
+        # Test previewing the staged file
+        prev_status, prev_headers, prev_body = self._request(f'/api/staging/{staged_fn}')
+        self.assertEqual(prev_status, 200)
+        self.assertEqual(prev_headers.get('Content-Type'), 'application/pdf')
+
+        # Test discarding the staged file
+        del_status, _, del_body = self._request(f'/api/staging/{staged_fn}', method='DELETE')
+        self.assertEqual(del_status, 200)
+        del_data = json.loads(del_body)
+        self.assertEqual(del_data.get('status'), 'DISCARDED')
+
+        # Verify it is no longer found
+        prev_status2, _, _ = self._request(f'/api/staging/{staged_fn}')
+        self.assertEqual(prev_status2, 404)
+
+    def test_archive_missing_staged_file_rejected(self):
+        """Verify /api/scan/archive rejects archiving a non-existent staged document."""
+        payload = {
+            'filename': 'ghost_file_does_not_exist.pdf',
+            'section': 'شخصي',
+        }
+        status, _, body = self._request('/api/scan/archive', method='POST', data=payload)
+        self.assertEqual(status, 404)
+        data = json.loads(body)
+        self.assertIn('not found', data.get('error', '').lower())
+
 
 if __name__ == '__main__':
     unittest.main()
