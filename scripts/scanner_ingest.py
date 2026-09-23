@@ -48,6 +48,17 @@ def find_naps2_executable() -> Optional[str]:
     return None
 
 
+SUPPORTED_EXTENSIONS = {
+    '.pdf': (b'%PDF',),
+    '.png': (b'\x89PNG\r\n\x1a\n',),
+    '.jpg': (b'\xff\xd8\xff',),
+    '.jpeg': (b'\xff\xd8\xff',),
+    '.tif': (b'II*\x00', b'MM\x00*'),
+    '.tiff': (b'II*\x00', b'MM\x00*'),
+}
+VALID_SOURCES = ('glass', 'feeder', 'duplex')
+
+
 def list_scanning_devices(driver: Optional[str] = None) -> Dict[str, List[str]]:
     """List detected scanning devices across WIA, TWAIN, and eSCL drivers."""
     naps2 = find_naps2_executable()
@@ -58,11 +69,13 @@ def list_scanning_devices(driver: Optional[str] = None) -> Dict[str, List[str]]:
     results = {}
     for d in drivers:
         try:
+            # WIA is local and instant; eSCL may take longer on network
+            timeout = 5 if d in ('wia', 'twain') else 8
             proc = subprocess.run(
                 [naps2, '--driver', d, '--listdevices'],
                 capture_output=True,
                 text=True,
-                timeout=15,
+                timeout=timeout,
                 encoding='utf-8',
                 errors='replace'
             )
@@ -104,9 +117,15 @@ def ingest_file(
     if not file_bytes:
         raise ValueError('Source file is empty.')
 
-    # Verify PDF magic header if file is .pdf
-    if source_path.suffix.lower() == '.pdf' and not file_bytes.startswith(b'%PDF'):
-        raise ValueError('File has .pdf extension but lacks valid %PDF header.')
+    ext = source_path.suffix.lower()
+    if ext not in SUPPORTED_EXTENSIONS:
+        raise ValueError(f'Unsupported file format "{ext}". Supported formats: {list(SUPPORTED_EXTENSIONS.keys())}')
+
+    valid_headers = SUPPORTED_EXTENSIONS[ext]
+    if not any(file_bytes.startswith(hdr) for hdr in valid_headers):
+        if ext == '.pdf':
+            raise ValueError('File has .pdf extension but lacks valid %PDF header.')
+        raise ValueError(f'File has {ext} extension but lacks a valid header signature.')
 
     sha256_hash = compute_file_hash(source_path)
 
@@ -161,6 +180,7 @@ def scan_document(
     dpi: int = 300,
     page_size: str = 'a4',
     bitdepth: str = 'color',
+    source: Optional[str] = None,
     multipage: bool = True,
     deskew: bool = True,
     output_filename: Optional[str] = None,
@@ -169,6 +189,9 @@ def scan_document(
     naps2 = find_naps2_executable()
     if not naps2:
         raise RuntimeError('NAPS2.Console.exe is not installed or not in PATH.')
+
+    if source and source not in VALID_SOURCES:
+        raise ValueError(f'Invalid source "{source}". Must be one of: {VALID_SOURCES}')
 
     STAGING_DIR.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
@@ -186,6 +209,8 @@ def scan_document(
     ]
     if device:
         cmd.extend(['--device', device])
+    if source:
+        cmd.extend(['--source', source])
     if deskew:
         cmd.append('--deskew')
 
@@ -212,6 +237,7 @@ def main():
     parser.add_argument('--list-devices', action='store_true', help='List connected scanners')
     parser.add_argument('--driver', default='wia', choices=['wia', 'twain', 'escl'], help='Scanner driver')
     parser.add_argument('--device', help='Scanner device name')
+    parser.add_argument('--source', choices=VALID_SOURCES, help='Paper source (glass/feeder/duplex)')
     parser.add_argument('--scan', action='store_true', help='Trigger a scan')
     parser.add_argument('--import-file', type=Path, help='Manually import an existing PDF or image')
     parser.add_argument('--section', default='شخصي', choices=VALID_SECTIONS, help='Target department/section')
@@ -233,7 +259,12 @@ def main():
         return
 
     if args.scan:
-        res = scan_document(section=args.section, device=args.device, driver=args.driver)
+        res = scan_document(
+            section=args.section,
+            device=args.device,
+            driver=args.driver,
+            source=args.source
+        )
         print(json.dumps(res, ensure_ascii=False, indent=2))
         return
 

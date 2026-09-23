@@ -1,0 +1,1375 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NAS Archive — الماسح الضوئي والأرشفة السريعة</title>
+  <style>
+    :root {
+      --primary: #0d9488;
+      --primary-hover: #0f766e;
+      --primary-light: #ccfbf1;
+      --primary-dark: #115e59;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --border-focus: #0d9488;
+      --success: #16a34a;
+      --success-bg: #dcfce7;
+      --warning: #d97706;
+      --warning-bg: #fef3c7;
+      --error: #dc2626;
+      --error-bg: #fee2e2;
+      --radius: 12px;
+      --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Noto Sans Arabic', Tahoma, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header */
+    header {
+      background: #0f172a;
+      color: #ffffff;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: var(--shadow);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon {
+      font-size: 26px;
+      background: rgba(255, 255, 255, 0.1);
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .brand h1 {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .brand p {
+      font-size: 12px;
+      color: #94a3b8;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      background: rgba(255, 255, 255, 0.08);
+      padding: 6px 12px;
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #94a3b8;
+    }
+
+    .dot.green { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+    .dot.yellow { background: #eab308; }
+    .dot.red { background: #ef4444; }
+
+    .btn-archive {
+      background: var(--primary);
+      color: #ffffff;
+      text-decoration: none;
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.2s;
+    }
+
+    .btn-archive:hover {
+      background: var(--primary-hover);
+    }
+
+    /* Main Container */
+    main {
+      max-width: 960px;
+      margin: 32px auto;
+      padding: 0 20px;
+      width: 100%;
+      flex: 1;
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      background: #e2e8f0;
+      border-radius: var(--radius);
+      padding: 4px;
+      margin-bottom: 24px;
+      gap: 4px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 12px 20px;
+      border: none;
+      background: transparent;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active {
+      background: var(--card-bg);
+      color: var(--primary-dark);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+
+    /* Card */
+    .card {
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 28px;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
+
+    .card-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Form Layout */
+    .form-group {
+      margin-bottom: 22px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+      color: #334155;
+      margin-bottom: 8px;
+    }
+
+    .form-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* Section Selector Cards */
+    .section-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 12px;
+    }
+
+    .section-card {
+      border: 2px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transition: all 0.2s;
+      background: #fafafa;
+      position: relative;
+    }
+
+    .section-card:hover {
+      border-color: #cbd5e1;
+      background: #f1f5f9;
+    }
+
+    .section-card input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+    }
+
+    .section-card.selected {
+      border-color: var(--primary);
+      background: var(--primary-light);
+      color: var(--primary-dark);
+      font-weight: 700;
+    }
+
+    .section-card .sec-icon {
+      font-size: 20px;
+    }
+
+    /* Grid for Inputs */
+    .row-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .row-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 768px) {
+      .row-2, .row-3 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    select, input[type="text"] {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 14px;
+      background: #ffffff;
+      color: var(--text);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    select:focus, input[type="text"]:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.15);
+    }
+
+    /* Checkbox & Options */
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      margin-top: 12px;
+    }
+
+    .checkbox-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .checkbox-label input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--primary);
+      cursor: pointer;
+    }
+
+    /* Action Buttons */
+    .btn-submit {
+      width: 100%;
+      background: var(--primary);
+      color: #ffffff;
+      padding: 14px 24px;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      transition: all 0.2s;
+      box-shadow: 0 4px 6px -1px rgba(13, 148, 136, 0.2);
+    }
+
+    .btn-submit:hover:not(:disabled) {
+      background: var(--primary-hover);
+      box-shadow: 0 6px 10px -1px rgba(13, 148, 136, 0.3);
+      transform: translateY(-1px);
+    }
+
+    .btn-submit:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Drag & Drop Zone */
+    .dropzone {
+      border: 2px dashed #94a3b8;
+      border-radius: var(--radius);
+      padding: 40px 20px;
+      text-align: center;
+      background: #fafafa;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 20px;
+    }
+
+    .dropzone.dragover, .dropzone:hover {
+      border-color: var(--primary);
+      background: var(--primary-light);
+    }
+
+    .dropzone-icon {
+      font-size: 40px;
+      color: #64748b;
+      margin-bottom: 12px;
+    }
+
+    .dropzone h3 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .dropzone p {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .file-preview {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #f1f5f9;
+      border: 1px solid var(--border);
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+
+    /* Live Pipeline / Progress Box */
+    .progress-box {
+      margin-top: 24px;
+      display: none;
+    }
+
+    .pipeline-steps {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      position: relative;
+    }
+
+    .pipeline-steps::before {
+      content: '';
+      position: absolute;
+      top: 18px;
+      right: 20px;
+      left: 20px;
+      height: 3px;
+      background: var(--border);
+      z-index: 1;
+    }
+
+    .step-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+      z-index: 2;
+      width: 80px;
+      text-align: center;
+    }
+
+    .step-circle {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 2px solid var(--border);
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      transition: all 0.3s;
+    }
+
+    .step-item.active .step-circle {
+      border-color: var(--primary);
+      background: var(--primary);
+      color: #ffffff;
+      box-shadow: 0 0 0 4px var(--primary-light);
+      animation: pulse 1.5s infinite;
+    }
+
+    .step-item.completed .step-circle {
+      border-color: var(--success);
+      background: var(--success);
+      color: #ffffff;
+    }
+
+    .step-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      line-height: 1.3;
+    }
+
+    .step-item.active .step-label {
+      color: var(--primary-dark);
+      font-weight: 700;
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(13, 148, 136, 0.4); }
+      70% { box-shadow: 0 0 0 8px rgba(13, 148, 136, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(13, 148, 136, 0); }
+    }
+
+    .progress-bar-container {
+      height: 8px;
+      background: #e2e8f0;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--primary), #14b8a6);
+      transition: width 0.3s ease;
+    }
+
+    .status-message {
+      font-size: 14px;
+      font-weight: 600;
+      color: #334155;
+      text-align: center;
+      margin-bottom: 6px;
+    }
+
+    /* Result Cards */
+    .result-card {
+      margin-top: 24px;
+      display: none;
+      padding: 20px;
+      border-radius: var(--radius);
+    }
+
+    .result-success {
+      background: var(--success-bg);
+      border: 1px solid #86efac;
+    }
+
+    .result-duplicate {
+      background: var(--warning-bg);
+      border: 1px solid #fde047;
+    }
+
+    .result-error {
+      background: var(--error-bg);
+      border: 1px solid #fca5a5;
+    }
+
+    .result-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .ocr-preview {
+      background: rgba(255, 255, 255, 0.7);
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 13px;
+      color: #334155;
+      max-height: 120px;
+      overflow-y: auto;
+      margin: 12px 0;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      direction: rtl;
+    }
+
+    .doc-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .meta-tag {
+      background: rgba(0, 0, 0, 0.06);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .btn-open-paperless {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--primary);
+      color: #ffffff;
+      text-decoration: none;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 14px;
+      transition: background 0.2s;
+    }
+
+    .btn-open-paperless:hover {
+      background: var(--primary-hover);
+    }
+
+    .btn-retry {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #475569;
+      color: #ffffff;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 14px;
+      border: none;
+      cursor: pointer;
+      margin-right: 8px;
+    }
+
+    /* Tasks History Table */
+    .table-container {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    th, td {
+      padding: 12px 14px;
+      text-align: right;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      background: #f8fafc;
+      font-weight: 600;
+      color: #475569;
+    }
+
+    tr:hover {
+      background: #f1f5f9;
+    }
+
+    footer {
+      text-align: center;
+      padding: 20px;
+      font-size: 12px;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border);
+      background: #ffffff;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <div class="brand">
+      <div class="brand-icon">🗄️</div>
+      <div>
+        <h1>NAS Archive</h1>
+        <p>بوابة المسح الضوئي والأرشفة الرسمية</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div class="status-pill" id="paperless-status">
+        <span class="dot yellow"></span>
+        <span>جاري فحص Paperless...</span>
+      </div>
+      <div class="status-pill" id="scanner-status">
+        <span class="dot yellow"></span>
+        <span>جاري فحص الماسح...</span>
+      </div>
+      <a href="http://localhost:8000" target="_blank" class="btn-archive">
+        <span>فتح الأرشيف</span>
+        <span>↗</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- Main Body -->
+  <main>
+
+    <!-- Navigation Tabs -->
+    <div class="tabs">
+      <button class="tab-btn active" id="tab-scan-btn" onclick="switchTab('scan')">
+        <span>📄</span>
+        <span>مسح ضوئي جديد</span>
+      </button>
+      <button class="tab-btn" id="tab-import-btn" onclick="switchTab('import')">
+        <span>📤</span>
+        <span>استيراد ملف يدوي</span>
+      </button>
+      <button class="tab-btn" id="tab-history-btn" onclick="switchTab('history')">
+        <span>🕒</span>
+        <span>سجل العمليات</span>
+      </button>
+    </div>
+
+    <!-- TAB 1: NEW SCAN -->
+    <div id="tab-scan" class="tab-content">
+      <div class="card">
+        <h2 class="card-title">
+          <span>⚙️</span>
+          <span>إعدادات المسح الضوئي</span>
+        </h2>
+
+        <!-- Section Selection -->
+        <div class="form-group">
+          <label class="form-label">1. القسم المستهدف للأرشفة والتصنيف:</label>
+          <div class="section-grid" id="scan-sections">
+            <div class="section-card selected" onclick="selectSection(this, 'شخصي')">
+              <input type="radio" name="scan_section" value="شخصي" checked>
+              <span class="sec-icon">👤</span>
+              <span>شخصي</span>
+            </div>
+            <div class="section-card" onclick="selectSection(this, 'الرنين')">
+              <input type="radio" name="scan_section" value="الرنين">
+              <span class="sec-icon">🏢</span>
+              <span>الرنين</span>
+            </div>
+            <div class="section-card" onclick="selectSection(this, 'تناسق')">
+              <input type="radio" name="scan_section" value="تناسق">
+              <span class="sec-icon">⚖️</span>
+              <span>تناسق</span>
+            </div>
+            <div class="section-card" onclick="selectSection(this, 'NAS FM')">
+              <input type="radio" name="scan_section" value="NAS FM">
+              <span class="sec-icon">📻</span>
+              <span>NAS FM</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scanner Device & Paper Source -->
+        <div class="row-2">
+          <div class="form-group">
+            <label class="form-label" for="scan-device">2. جهاز المسح الضوئي:</label>
+            <div style="display: flex; gap: 8px;">
+              <select id="scan-device">
+                <option value="">جاري اكتشاف الأجهزة...</option>
+              </select>
+              <button type="button" onclick="loadDevices()" title="تحديث قائمة الأجهزة" style="padding: 0 12px; background: #e2e8f0; border: none; border-radius: 8px; cursor: pointer;">🔄</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="scan-source">3. مصدر تلقيم الورق:</label>
+            <select id="scan-source">
+              <option value="auto">تلقائي (حسب إعدادات الجهاز)</option>
+              <option value="glass">مسطح الزجاج (Flatbed - وثائق فردية)</option>
+              <option value="feeder">مغذي المستندات (ADF - وجه واحد)</option>
+              <option value="duplex">مغذي المستندات (ADF - وجهين)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Color & DPI -->
+        <div class="row-3">
+          <div class="form-group">
+            <label class="form-label" for="scan-bitdepth">4. نمط الألوان:</label>
+            <select id="scan-bitdepth">
+              <option value="color" selected>ملون (Color - 24-bit)</option>
+              <option value="gray">تدرج الرمادي (Grayscale)</option>
+              <option value="bw">أبيض وأسود (Monochrome)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="scan-dpi">5. دقة المسح (DPI):</label>
+            <select id="scan-dpi">
+              <option value="150">150 DPI (سريع / مسودة)</option>
+              <option value="300" selected>300 DPI (الافتراضي الموصى به)</option>
+              <option value="600">600 DPI (عالي الدقة للأصول المهمة)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="scan-driver">6. مشغل المسح:</label>
+            <select id="scan-driver" onchange="loadDevices()">
+              <option value="wia" selected>WIA (ويندوز المباشر - الأسرع)</option>
+              <option value="twain">TWAIN</option>
+              <option value="escl">eSCL (الشبكة)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Checkbox Options -->
+        <div class="checkbox-row">
+          <label class="checkbox-label">
+            <input type="checkbox" id="scan-deskew" checked>
+            <span>تصحيح زاوية الميلان تلقائياً (Auto-Deskew)</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="scan-allow-dup">
+            <span>السماح بالأرشفة حتى لو كانت الوثيقة مكررة</span>
+          </label>
+        </div>
+
+        <!-- Scan Action Button -->
+        <div style="margin-top: 24px;">
+          <button id="btn-start-scan" class="btn-submit" onclick="startScan()">
+            <span>🖨️</span>
+            <span>بدء المسح الضوئي والأرشفة</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: MANUAL IMPORT -->
+    <div id="tab-import" class="tab-content" style="display: none;">
+      <div class="card">
+        <h2 class="card-title">
+          <span>📤</span>
+          <span>استيراد ملف يدوي إلى الأرشيف</span>
+        </h2>
+
+        <!-- Section Selection for Import -->
+        <div class="form-group">
+          <label class="form-label">1. القسم المستهدف للملف:</label>
+          <div class="section-grid" id="import-sections">
+            <div class="section-card selected" onclick="selectSection(this, 'شخصي', 'import')">
+              <input type="radio" name="import_section" value="شخصي" checked>
+              <span class="sec-icon">👤</span>
+              <span>شخصي</span>
+            </div>
+            <div class="section-card" onclick="selectSection(this, 'الرنين', 'import')">
+              <input type="radio" name="import_section" value="الرنين">
+              <span class="sec-icon">🏢</span>
+              <span>الرنين</span>
+            </div>
+            <div class="section-card" onclick="selectSection(this, 'تناسق', 'import')">
+              <input type="radio" name="import_section" value="تناسق">
+              <span class="sec-icon">⚖️</span>
+              <span>تناسق</span>
+            </div>
+            <div class="section-card" onclick="selectSection(this, 'NAS FM', 'import')">
+              <input type="radio" name="import_section" value="NAS FM">
+              <span class="sec-icon">📻</span>
+              <span>NAS FM</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dropzone -->
+        <div class="dropzone" id="dropzone" onclick="document.getElementById('file-input').click()">
+          <div class="dropzone-icon">📁</div>
+          <h3>اسحب وأفلت الملف هنا أو انقر للاختيار</h3>
+          <p>يدعم ملفات PDF وصور PNG وJPG وTIFF عالية الدقة</p>
+          <input type="file" id="file-input" style="display: none;" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff" onchange="handleFileSelect(this.files)">
+        </div>
+
+        <div id="file-preview-box" class="file-preview" style="display: none;">
+          <div>
+            <strong id="preview-filename">document.pdf</strong>
+            <span id="preview-filesize" style="font-size: 12px; color: var(--text-muted); margin-right: 8px;">(0 KB)</span>
+          </div>
+          <button type="button" onclick="clearSelectedFile()" style="background: transparent; border: none; color: #ef4444; font-size: 18px; cursor: pointer;">✕</button>
+        </div>
+
+        <div class="checkbox-row" style="margin-bottom: 20px;">
+          <label class="checkbox-label">
+            <input type="checkbox" id="import-allow-dup">
+            <span>السماح باستيراد الوثيقة إذا كانت مكررة مسبقاً</span>
+          </label>
+        </div>
+
+        <button id="btn-start-import" class="btn-submit" onclick="startImport()" disabled>
+          <span>📥</span>
+          <span>بدء الاستيراد والأرشفة</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- TAB 3: HISTORY -->
+    <div id="tab-history" class="tab-content" style="display: none;">
+      <div class="card">
+        <h2 class="card-title">
+          <span>🕒</span>
+          <span>سجل العمليات والمهام الأخيرة</span>
+        </h2>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>معرف المهمة</th>
+                <th>النوع</th>
+                <th>القسم</th>
+                <th>الحالة</th>
+                <th>الوقت</th>
+                <th>الإجراء</th>
+              </tr>
+            </thead>
+            <tbody id="history-tbody">
+              <tr>
+                <td colspan="6" style="text-align: center; color: var(--text-muted);">لا توجد عمليات سابقة بعد.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- LIVE PROGRESS TRACKER (Shared across operations) -->
+    <div id="progress-card" class="card progress-box">
+      <h3 class="card-title">
+        <span>🔄</span>
+        <span id="pipeline-title">جاري تنفيذ العملية...</span>
+      </h3>
+
+      <div class="pipeline-steps">
+        <div class="step-item" id="step-1">
+          <div class="step-circle">1</div>
+          <div class="step-label">الاتصال بالماسح</div>
+        </div>
+        <div class="step-item" id="step-2">
+          <div class="step-circle">2</div>
+          <div class="step-label">المسح الضوئي</div>
+        </div>
+        <div class="step-item" id="step-3">
+          <div class="step-circle">3</div>
+          <div class="step-label">حفظ الأصل</div>
+        </div>
+        <div class="step-item" id="step-4">
+          <div class="step-circle">4</div>
+          <div class="step-label">الترحيل للأرشيف</div>
+        </div>
+        <div class="step-item" id="step-5">
+          <div class="step-circle">5</div>
+          <div class="step-label">المعالجة وOCR</div>
+        </div>
+      </div>
+
+      <div class="progress-bar-container">
+        <div id="progress-fill" class="progress-bar-fill"></div>
+      </div>
+      <div id="status-msg" class="status-message">جاري التهيئة...</div>
+    </div>
+
+    <!-- SUCCESS RESULT CARD -->
+    <div id="success-card" class="result-card result-success">
+      <h3 class="result-title">
+        <span>✅</span>
+        <span>تمت أرشفة الوثيقة بنجاح وفهرستها في Paperless!</span>
+      </h3>
+      <div class="doc-meta">
+        <span class="meta-tag" id="meta-doc-id">معرف الوثيقة: #--</span>
+        <span class="meta-tag" id="meta-section">القسم: --</span>
+        <span class="meta-tag" id="meta-sha256" style="font-family: monospace;">بصمة SHA-256: --</span>
+      </div>
+      <div>
+        <h4 style="font-size: 13px; font-weight: 700; margin-bottom: 4px; color: #1e293b;">مقتطف من النص المستخرج بالـ OCR:</h4>
+        <div id="ocr-preview-box" class="ocr-preview">--</div>
+      </div>
+      <div id="ai-suggestions-box" style="margin-bottom: 16px; background: rgba(255,255,255,0.6); border-radius: 8px; padding: 12px; font-size: 13px;">
+        <h4 style="font-size: 13px; font-weight: 700; margin-bottom: 6px; color: #0f766e;">💡 مقترحات الذكاء الاصطناعي المستخرجة:</h4>
+        <div id="ai-suggestions-content">--</div>
+      </div>
+      <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <a id="link-open-paperless" href="#" target="_blank" class="btn-open-paperless">
+          <span>فتح الوثيقة داخل Paperless</span>
+          <span>↗</span>
+        </a>
+        <button class="btn-retry" onclick="resetPipeline()">مسح / استيراد وثيقة أخرى</button>
+      </div>
+    </div>
+
+    <!-- DUPLICATE RESULT CARD -->
+    <div id="duplicate-card" class="result-card result-duplicate">
+      <h3 class="result-title">
+        <span>⚠️</span>
+        <span>تنبيه: تم اكتشاف أن هذه الوثيقة ممسوحة مسبقاً بنفس البصمة الرقمية!</span>
+      </h3>
+      <p id="dup-msg" style="font-size: 14px; margin-bottom: 12px; color: #78350f;">
+        تم العثور على وثيقة مطابقة تماماً في الأرشيف ولم يتم تكرار استهلاكها حفاظاً على نظافة البيانات.
+      </p>
+      <div class="doc-meta">
+        <span class="meta-tag" id="dup-sha256" style="font-family: monospace;">SHA-256: --</span>
+      </div>
+      <div style="margin-top: 16px;">
+        <button class="btn-retry" onclick="retryWithForceDuplicate()">أرشفة الوثيقة على أي حال (تجاوز التكرار)</button>
+        <button class="btn-retry" onclick="resetPipeline()">إلغاء والعودة</button>
+      </div>
+    </div>
+
+    <!-- ERROR RESULT CARD -->
+    <div id="error-card" class="result-card result-error">
+      <h3 class="result-title">
+        <span>❌</span>
+        <span>حدث خطأ أثناء تنفيذ العملية</span>
+      </h3>
+      <p id="error-msg" style="font-size: 14px; margin-bottom: 16px; color: #991b1b;">
+        --
+      </p>
+      <button class="btn-retry" onclick="resetPipeline()">إعادة المحاولة</button>
+    </div>
+
+  </main>
+
+  <footer>
+    NAS Archive v1.1.0 — نظام الأرشفة الشخصي الذكي المؤمن | يدعم التوثيق والمسح الضوئي العربي
+  </footer>
+
+  <script>
+    let activeTaskPoll = null;
+    let selectedFile = null;
+    let lastScanPayload = null;
+
+    // Initialize UI on load
+    window.addEventListener('DOMContentLoaded', () => {
+      checkStatus();
+      loadDevices();
+      loadHistory();
+      setInterval(checkStatus, 6000);
+      setupDropzone();
+    });
+
+    // Tab Switching
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+      document.getElementById(`tab-${tabId}-btn`).classList.add('active');
+      document.getElementById(`tab-${tabId}`).style.display = 'block';
+      if (tabId === 'history') {
+        loadHistory();
+      }
+    }
+
+    // Section Selector
+    function selectSection(cardElement, sectionName, formType = 'scan') {
+      const container = document.getElementById(formType === 'scan' ? 'scan-sections' : 'import-sections');
+      container.querySelectorAll('.section-card').forEach(c => c.classList.remove('selected'));
+      cardElement.classList.add('selected');
+      const radio = cardElement.querySelector('input[type="radio"]');
+      if (radio) radio.checked = true;
+    }
+
+    function getSelectedSection(formType = 'scan') {
+      const name = formType === 'scan' ? 'scan_section' : 'import_section';
+      const checked = document.querySelector(`input[name="${name}"]:checked`);
+      return checked ? checked.value : 'شخصي';
+    }
+
+    // System Status
+    async function checkStatus() {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+        
+        // Paperless pill
+        const pPill = document.getElementById('paperless-status');
+        if (data.paperless && data.paperless.online) {
+          pPill.innerHTML = '<span class="dot green"></span><span>Paperless متصل</span>';
+        } else {
+          pPill.innerHTML = '<span class="dot red"></span><span>Paperless غير متصل</span>';
+        }
+
+        // Scanner pill
+        const sPill = document.getElementById('scanner-status');
+        if (data.scanner && data.scanner.detected_devices && data.scanner.detected_devices.length > 0) {
+          sPill.innerHTML = `<span class="dot green"></span><span>الماسح: ${data.scanner.detected_devices[0]}</span>`;
+        } else if (data.scanner && data.scanner.naps2_installed) {
+          sPill.innerHTML = '<span class="dot yellow"></span><span>NAPS2 مثبت (بانتظار جهاز)</span>';
+        } else {
+          sPill.innerHTML = '<span class="dot red"></span><span>الماسح غير متاح</span>';
+        }
+      } catch (err) {
+        console.error('Status check failed:', err);
+      }
+    }
+
+    // Devices Loading
+    async function loadDevices() {
+      const select = document.getElementById('scan-device');
+      const driver = document.getElementById('scan-driver').value || 'wia';
+      select.innerHTML = '<option value="">جاري فحص الأجهزة المتصلة...</option>';
+      try {
+        const res = await fetch(`/api/devices?driver=${encodeURIComponent(driver)}`);
+        const data = await res.json();
+        select.innerHTML = '';
+        if (data.devices && data.devices.length > 0) {
+          data.devices.forEach(dev => {
+            const opt = document.createElement('option');
+            opt.value = dev;
+            opt.textContent = `🖨️ ${dev}`;
+            select.appendChild(opt);
+          });
+        } else {
+          const opt = document.createElement('option');
+          opt.value = '';
+          opt.textContent = 'لم يتم العثور على أجهزة مسح ضوئي متصلة';
+          select.appendChild(opt);
+        }
+      } catch (err) {
+        select.innerHTML = '<option value="">فشل فحص الأجهزة</option>';
+      }
+    }
+
+    // Dropzone Setup
+    function setupDropzone() {
+      const dropzone = document.getElementById('dropzone');
+      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
+        dropzone.addEventListener(evt, e => {
+          e.preventDefault();
+          e.stopPropagation();
+        }, false);
+      });
+      ['dragenter', 'dragover'].forEach(evt => {
+        dropzone.addEventListener(evt, () => dropzone.classList.add('dragover'), false);
+      });
+      ['dragleave', 'drop'].forEach(evt => {
+        dropzone.addEventListener(evt, () => dropzone.classList.remove('dragover'), false);
+      });
+      dropzone.addEventListener('drop', e => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        if (files && files.length > 0) {
+          handleFileSelect(files);
+        }
+      });
+    }
+
+    function handleFileSelect(files) {
+      if (!files || files.length === 0) return;
+      selectedFile = files[0];
+      document.getElementById('preview-filename').textContent = selectedFile.name;
+      const sizeKB = (selectedFile.size / 1024).toFixed(1);
+      document.getElementById('preview-filesize').textContent = `(${sizeKB} KB)`;
+      document.getElementById('file-preview-box').style.display = 'flex';
+      document.getElementById('dropzone').style.display = 'none';
+      document.getElementById('btn-start-import').disabled = false;
+    }
+
+    function clearSelectedFile() {
+      selectedFile = null;
+      document.getElementById('file-input').value = '';
+      document.getElementById('file-preview-box').style.display = 'none';
+      document.getElementById('dropzone').style.display = 'block';
+      document.getElementById('btn-start-import').disabled = true;
+    }
+
+    // Start Scan
+    async function startScan() {
+      const section = getSelectedSection('scan');
+      const device = document.getElementById('scan-device').value;
+      const driver = document.getElementById('scan-driver').value;
+      const source = document.getElementById('scan-source').value;
+      const bitdepth = document.getElementById('scan-bitdepth').value;
+      const dpi = parseInt(document.getElementById('scan-dpi').value, 10);
+      const deskew = document.getElementById('scan-deskew').checked;
+      const allowDuplicate = document.getElementById('scan-allow-dup').checked;
+
+      const payload = {
+        section,
+        device: device || null,
+        driver,
+        source: source === 'auto' ? null : source,
+        bitdepth,
+        dpi,
+        deskew,
+        allow_duplicate: allowDuplicate
+      };
+      lastScanPayload = payload;
+
+      hideAllResults();
+      showProgress('جاري الاتصال بالماسح الضوئي...');
+      document.getElementById('btn-start-scan').disabled = true;
+
+      try {
+        const res = await fetch('/api/scan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (res.status === 202 && data.task_id) {
+          pollTask(data.task_id);
+        } else {
+          showError(data.error || 'فشل إرسال طلب المسح.');
+        }
+      } catch (err) {
+        showError(`خطأ في الشبكة أو الخادم: ${err.message}`);
+      }
+    }
+
+    // Start Import
+    async function startImport() {
+      if (!selectedFile) return;
+
+      const section = getSelectedSection('import');
+      const allowDuplicate = document.getElementById('import-allow-dup').checked;
+
+      hideAllResults();
+      showProgress('جاري قراءة الملف وتجهيز الاستيراد...');
+      document.getElementById('btn-start-import').disabled = true;
+
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64Data = reader.result.split(',')[1];
+        const payload = {
+          filename: selectedFile.name,
+          section,
+          file_data: base64Data,
+          allow_duplicate: allowDuplicate
+        };
+
+        try {
+          const res = await fetch('/api/import', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          const data = await res.json();
+          if (res.status === 202 && data.task_id) {
+            pollTask(data.task_id);
+          } else {
+            showError(data.error || 'فشل استيراد الملف.');
+          }
+        } catch (err) {
+          showError(`خطأ أثناء رفع الملف: ${err.message}`);
+        }
+      };
+      reader.readAsDataURL(selectedFile);
+    }
+
+    // Task Polling
+    function pollTask(taskId) {
+      if (activeTaskPoll) clearInterval(activeTaskPoll);
+
+      activeTaskPoll = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/tasks/${taskId}`);
+          if (!res.ok) return;
+          const task = await res.json();
+
+          updateProgressUI(task);
+
+          if (task.status === 'SUCCESS') {
+            clearInterval(activeTaskPoll);
+            showSuccess(task);
+            loadHistory();
+          } else if (task.status === 'DUPLICATE') {
+            clearInterval(activeTaskPoll);
+            showDuplicate(task);
+            loadHistory();
+          } else if (task.status === 'FAILED') {
+            clearInterval(activeTaskPoll);
+            showError(task.error || task.message || 'فشلت العملية.');
+            loadHistory();
+          }
+        } catch (err) {
+          console.error('Error polling task:', err);
+        }
+      }, 1000);
+    }
+
+    // Update Progress UI
+    function updateProgressUI(task) {
+      const step = task.step || 1;
+      const totalSteps = task.total_steps || 5;
+      const percent = Math.min(100, Math.round((step / totalSteps) * 100));
+
+      document.getElementById('progress-fill').style.width = `${percent}%`;
+      document.getElementById('status-msg').textContent = task.message || 'جاري المعالجة...';
+
+      // Update step circles
+      for (let i = 1; i <= 5; i++) {
+        const stepEl = document.getElementById(`step-${i}`);
+        if (!stepEl) continue;
+        stepEl.classList.remove('active', 'completed');
+        if (i < step) {
+          stepEl.classList.add('completed');
+        } else if (i === step) {
+          stepEl.classList.add('active');
+        }
+      }
+    }
+
+    // Display Helpers
+    function showProgress(msg) {
+      document.getElementById('progress-card').style.display = 'block';
+      document.getElementById('status-msg').textContent = msg;
+      document.getElementById('progress-fill').style.width = '10%';
+    }
+
+    function hideAllResults() {
+      document.getElementById('success-card').style.display = 'none';
+      document.getElementById('duplicate-card').style.display = 'none';
+      document.getElementById('error-card').style.display = 'none';
+    }
+
+    function showSuccess(task) {
+      document.getElementById('progress-card').style.display = 'none';
+      const card = document.getElementById('success-card');
+      card.style.display = 'block';
+
+      const res = task.result || {};
+      document.getElementById('meta-doc-id').textContent = `معرف الوثيقة: #${res.document_id || '--'}`;
+      document.getElementById('meta-section').textContent = `القسم: ${task.section || '--'}`;
+      document.getElementById('meta-sha256').textContent = `بصمة: ${(res.sha256 || '').substring(0, 16)}...`;
+      
+      document.getElementById('ocr-preview-box').textContent = res.ocr_preview || '(تمت المعالجة، جارٍ استخراج كامل النصوص)';
+      
+      // AI Suggestions
+      const aiBox = document.getElementById('ai-suggestions-content');
+      if (res.ai_suggestions) {
+        const s = res.ai_suggestions;
+        aiBox.innerHTML = `
+          <div><strong>العنوان المقترح:</strong> ${s.title || 'غير محدد'}</div>
+          <div><strong>رقم الكتاب:</strong> ${s.official_document_number || 'غير محدد'}</div>
+          <div><strong>الجهة المرسلة:</strong> ${s.sender || 'غير محدد'} | <strong>المستلمة:</strong> ${s.recipient || 'غير محدد'}</div>
+        `;
+      } else {
+        aiBox.textContent = 'جاهزة للمراجعة البشرية في Paperless.';
+      }
+
+      const link = document.getElementById('link-open-paperless');
+      link.href = res.paperless_url || `http://localhost:8000/documents/${res.document_id}/details`;
+
+      document.getElementById('btn-start-scan').disabled = false;
+      document.getElementById('btn-start-import').disabled = false;
+    }
+
+    function showDuplicate(task) {
+      document.getElementById('progress-card').style.display = 'none';
+      const card = document.getElementById('duplicate-card');
+      card.style.display = 'block';
+      const res = task.result || {};
+      document.getElementById('dup-sha256').textContent = `بصمة الملف: ${res.sha256 || '--'}`;
+      document.getElementById('dup-msg').textContent = task.message || 'تم العثور على وثيقة مطابقة تماماً في الأرشيف.';
+
+      document.getElementById('btn-start-scan').disabled = false;
+      document.getElementById('btn-start-import').disabled = false;
+    }
+
+    function showError(errorText) {
+      document.getElementById('progress-card').style.display = 'none';
+      const card = document.getElementById('error-card');
+      card.style.display = 'block';
+      document.getElementById('error-msg').textContent = errorText;
+
+      document.getElementById('btn-start-scan').disabled = false;
+      document.getElementById('btn-start-import').disabled = false;
+    }
+
+    function resetPipeline() {
+      hideAllResults();
+      document.getElementById('progress-card').style.display = 'none';
+      clearSelectedFile();
+      document.getElementById('btn-start-scan').disabled = false;
+    }
+
+    function retryWithForceDuplicate() {
+      if (lastScanPayload) {
+        lastScanPayload.allow_duplicate = true;
+        document.getElementById('scan-allow-dup').checked = true;
+        startScan();
+      } else if (selectedFile) {
+        document.getElementById('import-allow-dup').checked = true;
+        startImport();
+      }
+    }
+
+    // Load History
+    async function loadHistory() {
+      try {
+        const res = await fetch('/api/tasks');
+        const tasks = await res.json();
+        const tbody = document.getElementById('history-tbody');
+        tbody.innerHTML = '';
+        if (!tasks || tasks.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">لا توجد عمليات مسجلة بعد.</td></tr>';
+          return;
+        }
+
+        tasks.slice(0, 15).forEach(t => {
+          const tr = document.createElement('tr');
+          const typeBadge = t.type === 'scan' ? '📄 مسح ضوئي' : '📤 استيراد ملف';
+          let statusBadge = '';
+          if (t.status === 'SUCCESS') statusBadge = '<span style="color: #16a34a; font-weight: 700;">✅ مكتمل</span>';
+          else if (t.status === 'DUPLICATE') statusBadge = '<span style="color: #d97706; font-weight: 700;">⚠️ مكرر</span>';
+          else if (t.status === 'FAILED') statusBadge = '<span style="color: #dc2626; font-weight: 700;">❌ فشل</span>';
+          else statusBadge = '<span style="color: #0284c7; font-weight: 700;">⏳ جاري...</span>';
+
+          const timeStr = t.created_at ? new Date(t.created_at).toLocaleTimeString('ar-IQ') : '--';
+          const actionLink = (t.result && t.result.paperless_url) 
+            ? `<a href="${t.result.paperless_url}" target="_blank" style="color: var(--primary); text-decoration: none; font-weight: 600;">عرض الوثيقة ↗</a>`
+            : '--';
+
+          tr.innerHTML = `
+            <td style="font-family: monospace;">${t.task_id.substring(0, 18)}...</td>
+            <td>${typeBadge}</td>
+            <td>${t.section || '--'}</td>
+            <td>${statusBadge}</td>
+            <td>${timeStr}</td>
+            <td>${actionLink}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      } catch (err) {
+        console.error('History load failed:', err);
+      }
+    }
+  </script>
+</body>
+</html>
