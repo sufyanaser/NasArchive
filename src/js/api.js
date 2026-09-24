@@ -13,10 +13,20 @@ class ApiClient {
   async getStatus() {
     if (window.nasArchive && window.nasArchive.services) {
       const health = await window.nasArchive.services.getHealth();
+      const sc = health.scanner || {};
+      const devs = sc.devices || sc.detected_devices || [];
       return {
         paperless: { online: true, version: health.version || '2.0.0 (Native)' },
+        native: { online: true, version: '2.0.0' },
         bridge: { online: true, port: null },
-        scanner: health.scanner || { detected_devices: [] },
+        scanner: {
+          detected: devs.length > 0,
+          detected_devices: devs,
+          devices: devs,
+          ready: Boolean(sc.ready && devs.length > 0),
+          status: sc.status || (devs.length > 0 ? 'READY' : 'NO_DEVICES'),
+          activeDevice: sc.activeDevice || (devs.length > 0 ? devs[0] : null),
+        },
         database: health.database || { ok: true },
         ocr: health.ocr || { ready: true },
       };
@@ -25,7 +35,7 @@ class ApiClient {
       const res = await fetch('http://127.0.0.1:8001/api/status');
       return await res.json();
     } catch (e) {
-      return { paperless: { online: true }, bridge: { online: true }, scanner: { detected_devices: [] } };
+      return { paperless: { online: true }, native: { online: true }, bridge: { online: true }, scanner: { detected: false, detected_devices: [], devices: [], ready: false } };
     }
   }
 
@@ -40,6 +50,17 @@ class ApiClient {
     } catch (e) {
       return { driver, devices: [] };
     }
+  }
+
+  async checkScannerReadiness(device = null, driver = 'wia') {
+    if (window.nasArchive && window.nasArchive.scanner && window.nasArchive.scanner.checkReadiness) {
+      return await window.nasArchive.scanner.checkReadiness(device, driver);
+    }
+    const devicesRes = await this.getDevices(driver);
+    return {
+      ready: (devicesRes.devices || []).length > 0,
+      devices: devicesRes.devices || [],
+    };
   }
 
   // --- Two-Stage Scanning & Staging ---

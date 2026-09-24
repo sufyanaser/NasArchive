@@ -23,6 +23,7 @@ function setupNativeIpcHandlers(appDataDir) {
       const integrity = dbManager.checkIntegrity();
       const totalDocs = docService.getCount();
       const scannerRes = await scanner.listDevices('wia');
+      const readiness = await scanner.checkReadiness(null, 'wia');
 
       return {
         success: true,
@@ -37,6 +38,10 @@ function setupNativeIpcHandlers(appDataDir) {
         scanner: {
           detected: scannerRes.devices.length > 0,
           devices: scannerRes.devices,
+          detected_devices: scannerRes.devices,
+          ready: readiness.ready,
+          status: readiness.status,
+          activeDevice: readiness.activeDevice,
         },
         ocr: {
           tessdata: Boolean(ocr.tessdataDir),
@@ -257,12 +262,104 @@ function setupNativeIpcHandlers(appDataDir) {
     return { success: scanner.cancelScan() };
   });
 
-  // 5. Stage B: Explicit Archive
+  ipcMain.handle('scanner:readiness', async (event, { device, driver } = {}) => {
+    try {
+      const res = await scanner.checkReadiness(device, driver || 'wia');
+      return { success: true, ...res };
+    } catch (err) {
+      return { success: false, ready: false, error: err.message };
+    }
+  });
+
+  // 5. Staging Direct Access & PDF Preview Validation (Zero Network Exposure IPC)
+  ipcMain.handle('staging:read', async (event, filename) => {
+    try {
+      if (!filename || typeof filename !== 'string') {
+        return { success: false, error: 'اسم الملف غير صالح.' };
+      }
+      const safeName = storage.sanitizeFilename(filename);
+      let targetPath = path.join(storage.dirs.staging, safeName);
+      if (!fs.existsSync(targetPath)) {
+        const alt = path.resolve('runtime', 'staging', safeName);
+        if (fs.existsSync(alt)) targetPath = alt;
+      }
+
+      if (!fs.existsSync(targetPath)) {
+        return { success: false, error: `المستند غير موجود في مساحة المعاينة المؤقتة: ${safeName}` };
+      }
+
+      const stat = fs.statSync(targetPath);
+      if (stat.size === 0) {
+        return { success: false, error: 'ملف المستند فارغ (0 بايت).' };
+      }
+
+      if (safeName.toLowerCase().endsWith('.pdf') && !storage.validatePdfHeader(targetPath)) {
+        return { success: false, error: 'ملف المستند تالف أو لا يتطابق مع ترويسة PDF القياسية (%PDF-).' };
+      }
+
+      const buffer = fs.readFileSync(targetPath);
+      return {
+        success: true,
+        filename: safeName,
+        path: targetPath,
+        size: stat.size,
+        base64: buffer.toString('base64'),
+      };
+    } catch (err) {
+      return { success: false, error: `فشل قراءة ملف المعاينة: ${err.message}` };
+    }
+  });
+
+  ipcMain.handle('staging:validate', async (event, filename) => {
+    try {
+      if (!filename || typeof filename !== 'string') {
+        return { valid: false, error: 'اسم الملف غير صالح.' };
+      }
+      const safeName = storage.sanitizeFilename(filename);
+      let targetPath = path.join(storage.dirs.staging, safeName);
+      if (!fs.existsSync(targetPath)) {
+        const alt = path.resolve('runtime', 'staging', safeName);
+        if (fs.existsSync(alt)) targetPath = alt;
+      }
+
+      if (!fs.existsSync(targetPath)) {
+        return { valid: false, error: `المستند غير موجود في مساحة المعاينة المؤقتة: ${safeName}` };
+      }
+
+      const stat = fs.statSync(targetPath);
+      if (stat.size === 0) {
+        return { valid: false, error: 'ملف المستند فارغ (0 بايت).' };
+      }
+
+      if (safeName.toLowerCase().endsWith('.pdf') && !storage.validatePdfHeader(targetPath)) {
+        return { valid: false, error: 'ملف المستند تالف أو لا يتطابق مع ترويسة PDF القياسية (%PDF-).' };
+      }
+
+      return { valid: true, filename: safeName, size: stat.size };
+    } catch (err) {
+      return { valid: false, error: err.message };
+    }
+  });
+
+  // 6. Stage B: Explicit Archive
   ipcMain.handle('archive:stage', async (event, { filename, section = 'شخصي', allowDuplicate = false, title = null }) => {
     try {
-      const stagedPath = path.join(storage.dirs.staging, storage.sanitizeFilename(filename));
+      if (!filename || typeof filename !== 'string') {
+        throw new Error('اسم الملف غير محدد.');
+      }
+      const safeName = storage.sanitizeFilename(filename);
+      let stagedPath = path.join(storage.dirs.staging, safeName);
       if (!fs.existsSync(stagedPath)) {
-        throw new Error(`الملف المطلوب أرشفته غير موجود في مساحة المعاينة المؤقتة: ${filename}`);
+        const alt = path.resolve('runtime', 'staging', safeName);
+        if (fs.existsSync(alt)) stagedPath = alt;
+      }
+
+      if (!fs.existsSync(stagedPath)) {
+        throw new Error(`الملف المطلوب أرشفته غير موجود في مساحة المعاينة المؤقتة: ${safeName}`);
+      }
+
+      if (!storage.validatePdfHeader(stagedPath)) {
+        throw new Error('ملف المستند المطلوب أرشفته تالف ولا يطابق بنية PDF القياسية (%PDF-).');
       }
 
       const checksum = storage.computeFileHash(stagedPath);

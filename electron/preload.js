@@ -49,6 +49,7 @@ contextBridge.exposeInMainWorld('nasArchive', {
   // Scanner Hardware & Operations
   scanner: {
     getDevices: (driver) => ipcRenderer.invoke('scanner:devices', driver),
+    checkReadiness: (device, driver) => ipcRenderer.invoke('scanner:readiness', { device, driver }),
     scanStage: (options) => ipcRenderer.invoke('scanner:stage', options),
     cancel: () => ipcRenderer.invoke('scanner:cancel'),
   },

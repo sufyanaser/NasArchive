@@ -472,10 +472,15 @@ body {
   transform: translateY(-1px);
 }
 
-.btn-primary:disabled {
-  opacity: 0.5;
+.btn-primary:disabled,
+#btnArchive:disabled,
+#btnArchiveImport:disabled {
+  opacity: 0.38;
   cursor: not-allowed;
   transform: none;
+  filter: grayscale(0.6);
+  pointer-events: none;
+  box-shadow: none;
 }
 
 .btn-secondary {

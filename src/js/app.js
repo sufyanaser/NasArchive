@@ -151,16 +151,27 @@ class AppRouter {
       try {
         const data = await window.api.getStatus();
         if (pillPaperless) {
-          const isOnline = data.paperless && data.paperless.online;
+          const isOnline = (data.native && data.native.online) || (data.paperless && data.paperless.online);
           pillPaperless.className = `status-pill ${isOnline ? 'online' : 'offline'}`;
-          pillPaperless.querySelector('span:last-child').textContent = isOnline ? 'Paperless متصل' : 'Paperless غير متصل';
+          pillPaperless.querySelector('span:last-child').textContent = isOnline ? 'المحرك المحلي متصل' : 'المحرك المحلي غير متصل';
         }
 
         if (pillScanner) {
-          const devs = (data.scanner && data.scanner.detected_devices) || [];
+          const sc = data.scanner || {};
+          const devs = sc.devices || sc.detected_devices || [];
           const hasDev = devs.length > 0;
-          pillScanner.className = `status-pill ${hasDev ? 'online' : 'warning'}`;
-          pillScanner.querySelector('span:last-child').textContent = hasDev ? devs[0] : 'فحص الماسح...';
+          const isReady = sc.ready && hasDev;
+
+          if (isReady) {
+            pillScanner.className = 'status-pill online';
+            pillScanner.querySelector('span:last-child').textContent = `جاهز: ${devs[0]}`;
+          } else if (hasDev) {
+            pillScanner.className = 'status-pill warning';
+            pillScanner.querySelector('span:last-child').textContent = `مشغول: ${devs[0]}`;
+          } else {
+            pillScanner.className = 'status-pill warning';
+            pillScanner.querySelector('span:last-child').textContent = 'لا يوجد ماسح متصل';
+          }
         }
       } catch (e) {
         // bridge offline

@@ -222,6 +222,7 @@ class ScannerController {
    */
   async executeRescan() {
     if (!this.stagedDoc) return;
+    const previousDoc = { ...this.stagedDoc };
     const oldFilename = this.stagedDoc.filename;
 
     const payload = {
@@ -260,25 +261,30 @@ class ScannerController {
       }
     } catch (err) {
       this._showProgress(false);
+      this.stagedDoc = previousDoc;
       alert(`فشلت إعادة المسح (تم الاحتفاظ بالوثيقة السابقة):\n${err.message}`);
+      await this.loadAndValidatePreview();
     } finally {
       this.dom.rescanBtn.disabled = false;
-      this.dom.archiveBtn.disabled = false;
     }
   }
 
   /**
    * STAGE B: Explicit Archive action.
-   * Validates staged document, submits to Paperless, tracks OCR, and opens document.
+   * Validates staged document, submits to Native Engine, tracks OCR, and opens document.
    */
   async executeStageBArchive() {
-    if (!this.stagedDoc) return;
+    if (!this.stagedDoc || !this.stagedDoc.filename) {
+      alert('لا توجد وثيقة صالحة للأرشفة حالياً.');
+      return;
+    }
 
     // Validate before submitting to archive
     if (window.nasArchive && window.nasArchive.staging) {
       try {
         const v = await window.nasArchive.staging.validate(this.stagedDoc.filename);
         if (!v.valid) {
+          this.dom.archiveBtn.disabled = true;
           alert(`تعذر أرشفة الوثيقة:\n${v.error || 'المستند غير صالح أو تالف'}`);
           return;
         }

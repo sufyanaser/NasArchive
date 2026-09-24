@@ -75,6 +75,61 @@ class ScannerService {
   }
 
   /**
+   * Distinguish device discovery from actual scan readiness.
+   */
+  async checkReadiness(selectedDevice = null, driver = 'wia') {
+    const naps2 = this.findNaps2();
+    if (!naps2) {
+      return {
+        ready: false,
+        status: 'CLI_MISSING',
+        error: 'أداة المسح الضوئي NAPS2 غير متوفرة على النظام.',
+        devices: [],
+      };
+    }
+
+    if (this.currentProcess) {
+      return {
+        ready: false,
+        status: 'BUSY',
+        error: 'الماسح الضوئي قيد التشغيل حالياً في عملية مسح أخرى.',
+        devices: [],
+      };
+    }
+
+    const devRes = await this.listDevices(driver);
+    const devices = devRes.devices || [];
+
+    if (devices.length === 0) {
+      return {
+        ready: false,
+        status: 'NO_DEVICES',
+        error: 'لم يتم العثور على أي أجهزة مسح ضوئي متصلة.',
+        devices: [],
+      };
+    }
+
+    if (selectedDevice && typeof selectedDevice === 'string') {
+      const match = devices.find((d) => d.toLowerCase().includes(selectedDevice.toLowerCase()) || selectedDevice.toLowerCase().includes(d.toLowerCase()));
+      if (!match) {
+        return {
+          ready: false,
+          status: 'DEVICE_OFFLINE',
+          error: `جهاز المسح المختار (${selectedDevice}) غير متصل حالياً.`,
+          devices,
+        };
+      }
+    }
+
+    return {
+      ready: true,
+      status: 'READY',
+      activeDevice: selectedDevice || devices[0],
+      devices,
+    };
+  }
+
+  /**
    * Execute physical scan and save output to staging for immediate user preview.
    */
   scanToStaging(options = {}) {
@@ -94,7 +149,7 @@ class ScannerService {
       }
 
       const now = new Date();
-      const timestamp = now.toISOString().replace(/[-:T]/g, '').slice(0, 15);
+      const timestamp = now.toISOString().replace(/[-:T.Z]/g, '').slice(0, 14);
       const safeFilename = options.output_filename
         ? storage.sanitizeFilename(options.output_filename)
         : `scan_${timestamp}_${section}.pdf`;

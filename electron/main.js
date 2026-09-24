@@ -23,7 +23,6 @@ let tray = null;
 let isQuitting = false;
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
-const STAGING_DIR = path.join(PROJECT_ROOT, 'runtime', 'staging');
 const ASSETS_DIR = path.join(PROJECT_ROOT, 'assets');
 const ICON_PATH = path.join(ASSETS_DIR, 'Dev-printer.ico');
 const PREFS_PATH = path.join(app.getPath('userData'), 'nas_preferences.json');
@@ -342,88 +341,6 @@ function setupIpcHandlers() {
       ...options,
     });
     return res.response === 0;
-  });
-
-  // Staging Direct Document Access (Secure Local IPC)
-  ipcMain.handle('staging:read', async (event, filename) => {
-    try {
-      if (!filename || typeof filename !== 'string') {
-        return { success: false, error: 'اسم الملف غير صالح.' };
-      }
-      let decoded = filename;
-      try {
-        decoded = decodeURIComponent(filename);
-      } catch (e) {
-        decoded = filename;
-      }
-      const safeName = path.basename(decoded).replace(/[^a-zA-Z0-9_\-\.\u0600-\u06FF]/g, '_');
-      const targetPath = path.resolve(STAGING_DIR, safeName);
-
-      if (!targetPath.startsWith(STAGING_DIR) || !fs.existsSync(targetPath)) {
-        return { success: false, error: 'المستند غير موجود في مساحة المعاينة المؤقتة.' };
-      }
-
-      const stat = fs.statSync(targetPath);
-      if (stat.size === 0) {
-        return { success: false, error: 'ملف المستند فارغ (0 بايت).' };
-      }
-
-      const buffer = fs.readFileSync(targetPath);
-      if (safeName.toLowerCase().endsWith('.pdf')) {
-        const header = buffer.subarray(0, 5).toString('ascii');
-        if (header !== '%PDF-') {
-          return { success: false, error: 'ملف المستند تالف أو لا يتطابق مع ترويسة PDF القياسية.' };
-        }
-      }
-
-      return {
-        success: true,
-        filename: safeName,
-        size: stat.size,
-        base64: buffer.toString('base64'),
-      };
-    } catch (err) {
-      return { success: false, error: `فشل قراءة ملف المعاينة: ${err.message}` };
-    }
-  });
-
-  ipcMain.handle('staging:validate', async (event, filename) => {
-    try {
-      if (!filename || typeof filename !== 'string') {
-        return { valid: false, error: 'اسم الملف غير صالح.' };
-      }
-      let decoded = filename;
-      try {
-        decoded = decodeURIComponent(filename);
-      } catch (e) {
-        decoded = filename;
-      }
-      const safeName = path.basename(decoded).replace(/[^a-zA-Z0-9_\-\.\u0600-\u06FF]/g, '_');
-      const targetPath = path.resolve(STAGING_DIR, safeName);
-
-      if (!targetPath.startsWith(STAGING_DIR) || !fs.existsSync(targetPath)) {
-        return { valid: false, error: 'المستند غير موجود في مساحة المعاينة المؤقتة.' };
-      }
-
-      const stat = fs.statSync(targetPath);
-      if (stat.size === 0) {
-        return { valid: false, error: 'ملف المستند فارغ (0 بايت).' };
-      }
-
-      if (safeName.toLowerCase().endsWith('.pdf')) {
-        const fd = fs.openSync(targetPath, 'r');
-        const headerBuf = Buffer.alloc(5);
-        fs.readSync(fd, headerBuf, 0, 5, 0);
-        fs.closeSync(fd);
-        if (headerBuf.toString('ascii') !== '%PDF-') {
-          return { valid: false, error: 'ملف المستند تالف أو لا يتطابق مع ترويسة PDF القياسية.' };
-        }
-      }
-
-      return { valid: true, filename: safeName, size: stat.size };
-    } catch (err) {
-      return { valid: false, error: err.message };
-    }
   });
 }
 
