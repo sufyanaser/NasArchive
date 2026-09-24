@@ -1,7 +1,7 @@
 {
   "name": "nas-archive",
-  "version": "1.2.1",
-  "description": "NAS Archive — نظام الأرشفة الذكي والمسح الضوئي المكتبي المتكامل",
+  "version": "2.0.0",
+  "description": "NAS Archive Native — نظام الأرشفة الذكي والمسح الضوئي المكتبي المتكامل",
   "main": "electron/main.js",
   "scripts": {
     "start": "electron .",
@@ -34,12 +34,20 @@
       "uninstallDisplayName": "NAS Archive",
       "runAfterFinish": true
     },
+    "extraResources": [
+      {
+        "from": "assets/tessdata",
+        "to": "tessdata",
+        "filter": [
+          "*.traineddata"
+        ]
+      }
+    ],
     "files": [
       "electron/**/*",
       "src/**/*",
       "assets/**/*",
-      "scripts/**/*",
-      "compose.yaml"
+      "!assets/tessdata/**/*"
     ]
   },
   "devDependencies": {

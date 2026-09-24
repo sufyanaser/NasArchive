@@ -7,6 +7,8 @@ const { app, BrowserWindow, ipcMain, dialog, Menu, Tray, shell } = require('elec
 const fs = require('fs');
 const path = require('path');
 const serviceManager = require('./service_manager');
+const { setupNativeIpcHandlers } = require('./core/ipc_handlers');
+const dbManager = require('./core/db');
 
 // Enforce single instance
 const gotTheLock = app.requestSingleInstanceLock();
@@ -435,7 +437,10 @@ app.on('second-instance', () => {
 });
 
 app.whenReady().then(async () => {
+  // Initialize native database and document storage
+  serviceManager.initialize(app.getPath('userData'), PROJECT_ROOT);
   setupIpcHandlers();
+  setupNativeIpcHandlers(app.getPath('userData'));
   createSplashWindow();
   createSystemTray();
 
@@ -461,9 +466,9 @@ app.whenReady().then(async () => {
         }
         mainWindow.show();
         mainWindow.focus();
-      }, 700);
+      }, 500);
     });
-  }, 400);
+  }, 200);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -476,6 +481,9 @@ app.whenReady().then(async () => {
 
 app.on('before-quit', () => {
   isQuitting = true;
+  try {
+    dbManager.close();
+  } catch (e) {}
 });
 
 app.on('window-all-closed', () => {

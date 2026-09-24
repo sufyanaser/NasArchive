@@ -154,6 +154,7 @@ class DocumentsController {
     }
 
     if (this.currentDepartment !== 'الكل') {
+      params['department'] = this.currentDepartment;
       // Find tag ID for selected department
       const tagEntry = Object.values(this.tagsMap).find((t) => t.name === this.currentDepartment);
       if (tagEntry) {
@@ -296,7 +297,18 @@ class DocumentsController {
     // Open Modal
     this.dom.modal.classList.add('open');
 
-    // Load PDF Preview into modal viewer
+    // Load PDF Preview into modal viewer via Native IPC or URL fallback
+    if (window.nasArchive && window.nasArchive.documents && window.nasArchive.documents.readBinary) {
+      try {
+        const bin = await window.nasArchive.documents.readBinary(doc.id);
+        if (bin.success && bin.base64) {
+          await this.modalPdfViewer.loadDocument(bin.base64);
+          return;
+        }
+      } catch (ipcErr) {
+        console.warn('IPC readBinary fallback:', ipcErr);
+      }
+    }
     const previewUrl = `http://127.0.0.1:8000/api/documents/${doc.id}/preview/`;
     await this.modalPdfViewer.loadDocument(previewUrl);
   }
@@ -381,6 +393,17 @@ class DocumentsController {
 
   async downloadActiveDocument() {
     if (!this.activeDocument) return;
+    if (window.nasArchive && window.nasArchive.documents && window.nasArchive.documents.exportFile) {
+      try {
+        const res = await window.nasArchive.documents.exportFile(this.activeDocument.id);
+        if (res.success && res.savedPath) {
+          alert(`تم حفظ المستند بنجاح في:\n${res.savedPath}`);
+          return;
+        }
+      } catch (ipcErr) {
+        console.warn('Native export fallback:', ipcErr);
+      }
+    }
     const downloadUrl = `http://127.0.0.1:8000/api/documents/${this.activeDocument.id}/download/`;
     window.open(downloadUrl, '_blank');
   }

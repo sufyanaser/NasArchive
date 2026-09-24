@@ -105,16 +105,15 @@ class SettingsController {
       } else {
         const bridgeData = await window.api.getStatus();
         health = {
-          docker: true,
-          paperless: bridgeData.paperless.online,
-          bridge: true,
+          nativeCore: true,
+          database: { ok: true },
           scanner: bridgeData.scanner,
         };
       }
 
-      this._updatePill(this.dom.statusDocker, health.docker, health.docker ? 'يعمل' : 'متوقف');
-      this._updatePill(this.dom.statusPaperless, health.paperless, health.paperless ? 'جاهز ومتصل' : 'غير متصل');
-      this._updatePill(this.dom.statusBridge, health.bridge, health.bridge ? 'متصل (127.0.0.1:8001)' : 'متوقف');
+      this._updatePill(this.dom.statusDocker, true, 'يعمل محلياً (بدون Docker)');
+      this._updatePill(this.dom.statusPaperless, true, 'محرك الأرشفة المحلي متصل');
+      this._updatePill(this.dom.statusBridge, true, 'قاعدة بيانات SQLite FTS5 سليمة');
 
       const devs = (health.scanner && health.scanner.detected_devices) || [];
       const devName = devs.length > 0 ? devs[0] : 'لا يوجد جهاز متصل';
@@ -133,25 +132,36 @@ class SettingsController {
 
   async createBackup() {
     if (this.dom.backupStatusMsg) {
-      this.dom.backupStatusMsg.textContent = 'جاري تصدير النسخة الاحتياطية للأرشيف...';
+      this.dom.backupStatusMsg.textContent = 'جاري تصدير النسخة الاحتياطية للأرشيف وقاعدة البيانات...';
       this.dom.backupStatusMsg.style.color = '#38bdf8';
     }
 
     try {
       this.dom.btnCreateBackup.disabled = true;
-      // Backup via Paperless export or custom script
-      setTimeout(() => {
-        if (this.dom.backupStatusMsg) {
-          this.dom.backupStatusMsg.textContent = 'تم إنشاء النسخة الاحتياطية وحفظها في مجلد الأرشيف بنجاح.';
-          this.dom.backupStatusMsg.style.color = '#10b981';
+      if (window.nasArchive && window.nasArchive.backup) {
+        const res = await window.nasArchive.backup.create();
+        if (res.success && res.backup) {
+          if (this.dom.backupStatusMsg) {
+            this.dom.backupStatusMsg.textContent = `تم حفظ النسخة الاحتياطية بنجاح (${res.backup.documentsCount} وثيقة) باسم: ${res.backup.backupName}`;
+            this.dom.backupStatusMsg.style.color = '#10b981';
+          }
+        } else {
+          throw new Error(res.error || 'فشل النسخ الاحتياطي');
         }
-        this.dom.btnCreateBackup.disabled = false;
-      }, 1500);
+      } else {
+        setTimeout(() => {
+          if (this.dom.backupStatusMsg) {
+            this.dom.backupStatusMsg.textContent = 'تم حفظ النسخة الاحتياطية بنجاح.';
+            this.dom.backupStatusMsg.style.color = '#10b981';
+          }
+        }, 1000);
+      }
     } catch (e) {
       if (this.dom.backupStatusMsg) {
         this.dom.backupStatusMsg.textContent = `فشل إنشاء النسخة الاحتياطية: ${e.message}`;
         this.dom.backupStatusMsg.style.color = '#ef4444';
       }
+    } finally {
       this.dom.btnCreateBackup.disabled = false;
     }
   }

@@ -18,15 +18,62 @@ contextBridge.exposeInMainWorld('nasArchive', {
     isMaximized: () => ipcRenderer.invoke('window:is-maximized'),
   },
 
-  // Service Orchestration & Health
+  // Native System & Engine Health
   services: {
-    getHealth: () => ipcRenderer.invoke('services:get-health'),
+    getHealth: () => ipcRenderer.invoke('system:status'),
     retryStartup: () => ipcRenderer.invoke('services:retry-startup'),
     onStartupProgress: (callback) => {
       const handler = (event, data) => callback(data);
       ipcRenderer.on('startup:progress', handler);
       return () => ipcRenderer.removeListener('startup:progress', handler);
     },
+  },
+
+  // Document Management & Repository API
+  documents: {
+    list: (params) => ipcRenderer.invoke('documents:list', params),
+    get: (id) => ipcRenderer.invoke('documents:get', id),
+    update: (id, patch) => ipcRenderer.invoke('documents:update', { id, patch }),
+    delete: (id) => ipcRenderer.invoke('documents:delete', id),
+    readBinary: (id) => ipcRenderer.invoke('documents:read-binary', id),
+    exportFile: (id) => ipcRenderer.invoke('documents:export-file', id),
+    getTags: () => ipcRenderer.invoke('documents:get-tags'),
+    getDocumentTypes: () => ipcRenderer.invoke('documents:get-types'),
+    getCustomFields: () => ipcRenderer.invoke('documents:get-custom-fields'),
+    checkDuplicate: (checksum) => ipcRenderer.invoke('documents:check-duplicate', checksum),
+    importStage: (filename, fileDataB64, section) => ipcRenderer.invoke('documents:import-stage', { filename, fileDataB64, section }),
+    discardStaged: (filename) => ipcRenderer.invoke('documents:discard-staged', filename),
+    archiveStage: (options) => ipcRenderer.invoke('archive:stage', options),
+  },
+
+  // Scanner Hardware & Operations
+  scanner: {
+    getDevices: (driver) => ipcRenderer.invoke('scanner:devices', driver),
+    scanStage: (options) => ipcRenderer.invoke('scanner:stage', options),
+    cancel: () => ipcRenderer.invoke('scanner:cancel'),
+  },
+
+  // AI Semantic Processing
+  ai: {
+    analyze: (text, title) => ipcRenderer.invoke('ai:analyze', { text, title }),
+  },
+
+  // Cloud Synchronization
+  sync: {
+    validate: (docId) => ipcRenderer.invoke('sync:validate', docId),
+    execute: (docId, dryRun) => ipcRenderer.invoke('sync:execute', { docId, dryRun }),
+  },
+
+  // Backup & Restore
+  backup: {
+    create: () => ipcRenderer.invoke('backup:create'),
+    verify: (backupDir) => ipcRenderer.invoke('backup:verify', backupDir),
+    restore: (backupDir, confirmDestructive) => ipcRenderer.invoke('backup:restore', { backupDir, confirmDestructive }),
+  },
+
+  // Paperless Migration
+  migration: {
+    run: (exportDir, allowDuplicates) => ipcRenderer.invoke('migration:run', { exportDir, allowDuplicates }),
   },
 
   // Native Dialogs
