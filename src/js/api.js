@@ -208,10 +208,21 @@ class ApiClient {
     if (window.nasArchive && window.nasArchive.documents) {
       const queryParams = {
         department: params.department || null,
-        tag_id: params.tag_id || params.tags__id__in || null,
+        tag_id: params.tag_id || params.tags__id__in || params.tag || null,
+        tags: params.tags || null,
+        correspondent_id: params.correspondent_id || params.correspondent || null,
+        document_type_id: params.document_type_id || params.document_type || null,
+        storage_path_id: params.storage_path_id || params.storage_path || null,
+        date_from: params.date_from || null,
+        date_to: params.date_to || null,
         search: params.query || params.search || null,
+        inbox_only: Boolean(params.inbox_only),
+        is_approved_for_sync: params.is_approved_for_sync,
+        status: params.status || null,
+        ordering: params.ordering || params.sort_by || '-created',
         page: params.page || 1,
         page_size: params.page_size || 50,
+        trash: Boolean(params.trash),
       };
       if (params.query === 'بانتظار المراجعة' || params.search === 'بانتظار المراجعة') {
         queryParams.inbox_only = true;
@@ -219,8 +230,8 @@ class ApiClient {
       }
       const data = await window.nasArchive.documents.list(queryParams);
       return {
-        count: data.count,
-        results: data.results,
+        count: data.count || 0,
+        results: data.results || [],
       };
     }
 
@@ -253,15 +264,85 @@ class ApiClient {
     return await res.json();
   }
 
-  async deleteDocument(id) {
+  async deleteDocument(id, permanent = false) {
     if (window.nasArchive && window.nasArchive.documents) {
-      const res = await window.nasArchive.documents.delete(id);
+      const res = await window.nasArchive.documents.delete(id, permanent);
       return res.success;
     }
     const res = await fetch(`http://127.0.0.1:8000/api/documents/${id}/`, { method: 'DELETE' });
     return res.status === 204;
   }
 
+  async restoreDocument(id) {
+    if (window.nasArchive && window.nasArchive.documents) {
+      const res = await window.nasArchive.documents.restore(id);
+      return res.success;
+    }
+    return false;
+  }
+
+  async getTrash(params = {}) {
+    return this.getDocuments({ ...params, trash: true });
+  }
+
+  async purgeTrash() {
+    if (window.nasArchive && window.nasArchive.trash) {
+      return await window.nasArchive.trash.purge();
+    }
+    return { success: false };
+  }
+
+  // --- Bulk Operations ---
+  async bulkDelete(ids, permanent = false) {
+    if (window.nasArchive && window.nasArchive.documents) {
+      return await window.nasArchive.documents.bulkDelete(ids, permanent);
+    }
+    return { success: false, count: 0 };
+  }
+
+  async bulkRestore(ids) {
+    if (window.nasArchive && window.nasArchive.documents) {
+      return await window.nasArchive.documents.bulkRestore(ids);
+    }
+    return { success: false, count: 0 };
+  }
+
+  async bulkAddTag(ids, tagId) {
+    if (window.nasArchive && window.nasArchive.documents) {
+      return await window.nasArchive.documents.bulkAddTag(ids, tagId);
+    }
+    return { success: false, count: 0 };
+  }
+
+  async bulkRemoveTag(ids, tagId) {
+    if (window.nasArchive && window.nasArchive.documents) {
+      return await window.nasArchive.documents.bulkRemoveTag(ids, tagId);
+    }
+    return { success: false, count: 0 };
+  }
+
+  async bulkApprove(ids) {
+    if (window.nasArchive && window.nasArchive.documents) {
+      return await window.nasArchive.documents.bulkApprove(ids);
+    }
+    return { success: false, count: 0 };
+  }
+
+  async bulkSetType(ids, typeId) {
+    if (window.nasArchive && window.nasArchive.documents) {
+      return await window.nasArchive.documents.bulkSetType(ids, typeId);
+    }
+    return { success: false, count: 0 };
+  }
+
+  async bulkSetCorrespondent(ids, corrId) {
+    if (window.nasArchive && window.nasArchive.documents) {
+      return await window.nasArchive.documents.bulkSetCorrespondent(ids, corrId);
+    }
+    return { success: false, count: 0 };
+  }
+
+  // --- Classification Lists & CRUD ---
   async getTags() {
     if (window.nasArchive && window.nasArchive.documents) {
       return await window.nasArchive.documents.getTags();
@@ -284,6 +365,87 @@ class ApiClient {
     }
     const res = await fetch('http://127.0.0.1:8000/api/custom_fields/');
     return await res.json();
+  }
+
+  async getCorrespondents() {
+    if (window.nasArchive && window.nasArchive.documents) {
+      return await window.nasArchive.documents.getCorrespondents();
+    }
+    return { count: 0, results: [] };
+  }
+
+  async getStoragePaths() {
+    if (window.nasArchive && window.nasArchive.documents) {
+      return await window.nasArchive.documents.getStoragePaths();
+    }
+    return { count: 0, results: [] };
+  }
+
+  // --- Saved Views ---
+  async getSavedViews() {
+    if (window.nasArchive && window.nasArchive.savedViews) {
+      return await window.nasArchive.savedViews.list();
+    }
+    return { count: 0, results: [] };
+  }
+
+  async createSavedView(data) {
+    if (window.nasArchive && window.nasArchive.savedViews) {
+      return await window.nasArchive.savedViews.create(data);
+    }
+    return null;
+  }
+
+  async deleteSavedView(id) {
+    if (window.nasArchive && window.nasArchive.savedViews) {
+      return await window.nasArchive.savedViews.delete(id);
+    }
+    return { success: false };
+  }
+
+  // --- Workflows ---
+  async getWorkflows() {
+    if (window.nasArchive && window.nasArchive.workflows) {
+      return await window.nasArchive.workflows.list();
+    }
+    return { count: 0, results: [] };
+  }
+
+  async createWorkflow(data) {
+    if (window.nasArchive && window.nasArchive.workflows) {
+      return await window.nasArchive.workflows.create(data);
+    }
+    return null;
+  }
+
+  async deleteWorkflow(id) {
+    if (window.nasArchive && window.nasArchive.workflows) {
+      return await window.nasArchive.workflows.delete(id);
+    }
+    return { success: false };
+  }
+
+  // --- Tasks & Logs ---
+  async getTasksList(limit = 50) {
+    if (window.nasArchive && window.nasArchive.tasks) {
+      return await window.nasArchive.tasks.list(limit);
+    }
+    return { count: 0, results: [] };
+  }
+
+  async getLogsList(filter = {}) {
+    if (window.nasArchive && window.nasArchive.logs) {
+      return await window.nasArchive.logs.list(filter);
+    }
+    return { count: 0, results: [] };
+  }
+
+  // --- Users ---
+  async getUsers() {
+    if (window.nasArchive && window.nasArchive.users) {
+      return await window.nasArchive.users.list();
+    }
+    return { count: 0, results: [] };
   }
 }
 

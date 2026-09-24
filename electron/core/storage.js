@@ -46,6 +46,10 @@ class DocumentStorage {
     return hash.digest('hex');
   }
 
+  calculateChecksum(filePath) {
+    return this.computeFileHash(filePath);
+  }
+
   /**
    * Compute SHA-256 checksum of a buffer.
    */

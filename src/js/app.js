@@ -15,6 +15,7 @@ class AppRouter {
     this.importController = null;
     this.dashboardController = null;
     this.settingsController = null;
+    this.archiveExtended = null;
   }
 
   async init() {
@@ -29,12 +30,14 @@ class AppRouter {
     this.importController = new window.ImportController();
     this.dashboardController = new window.DashboardController();
     this.settingsController = new window.SettingsController();
+    this.archiveExtended = window.archiveExtended || new window.ArchiveExtendedController();
 
     window.scannerController = this.scannerController;
     window.documentsController = this.documentsController;
     window.importController = this.importController;
     window.dashboardController = this.dashboardController;
     window.settingsController = this.settingsController;
+    window.archiveExtended = this.archiveExtended;
 
     await Promise.all([
       this.scannerController.init(),
@@ -42,6 +45,7 @@ class AppRouter {
       this.importController.init(),
       this.dashboardController.init(),
       this.settingsController.init(),
+      this.archiveExtended.init(),
     ]);
 
     // Initial navigation
@@ -66,6 +70,9 @@ class AppRouter {
   }
 
   _setupNavigation() {
+    this.navItems = document.querySelectorAll('.sidebar .nav-item');
+    this.viewPanes = document.querySelectorAll('.workspace .view-pane');
+
     this.navItems.forEach((item) => {
       item.addEventListener('click', (e) => {
         e.preventDefault();
@@ -103,6 +110,20 @@ class AppRouter {
       this.dashboardController.refresh();
     } else if (route === 'settings' && this.settingsController) {
       this.settingsController.refreshServiceStatus();
+    } else if (route === 'attributes' && this.archiveExtended) {
+      this.archiveExtended.renderAttributesTab();
+    } else if (route === 'savedViews' && this.archiveExtended) {
+      this.archiveExtended.renderSavedViews();
+    } else if (route === 'workflows' && this.archiveExtended) {
+      this.archiveExtended.renderWorkflows();
+    } else if (route === 'trash' && this.archiveExtended) {
+      this.archiveExtended.renderTrash();
+    } else if (route === 'tasks' && this.archiveExtended) {
+      this.archiveExtended.renderTasks();
+    } else if (route === 'logs' && this.archiveExtended) {
+      this.archiveExtended.renderLogs();
+    } else if (route === 'users' && this.archiveExtended) {
+      this.archiveExtended.renderUsers();
     }
   }
 

@@ -55,6 +55,18 @@ class DatabaseManager {
 
     for (const migration of MIGRATIONS) {
       if (!appliedVersions.has(migration.version)) {
+        // Pre-migration verified backup
+        try {
+          if (this.dbPath && fs.existsSync(this.dbPath)) {
+            const backupDir = path.join(path.dirname(this.dbPath), 'pre_migration_backups');
+            if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+            const backupPath = path.join(backupDir, `db_v${migration.version}_${Date.now()}.sqlite`);
+            fs.copyFileSync(this.dbPath, backupPath);
+          }
+        } catch (backupErr) {
+          console.warn('[DatabaseManager] Pre-migration backup warning:', backupErr.message);
+        }
+
         // Execute migration
         migration.up(this.db);
         const stmt = this.db.prepare('INSERT INTO schema_migrations (version, description, applied_at) VALUES (?, ?, ?)');

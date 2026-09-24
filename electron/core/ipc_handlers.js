@@ -15,6 +15,8 @@ const aiAnalyzer = require('./ai_analyzer');
 const syncService = require('./sync_ledger');
 const backupService = require('./backup');
 const migrator = require('./migrator');
+const classification = require('./classification');
+const archiveService = require('./archive_service');
 
 function setupNativeIpcHandlers(appDataDir) {
   // 1. System & Engine Health Status
@@ -87,10 +89,108 @@ function setupNativeIpcHandlers(appDataDir) {
     }
   });
 
-  ipcMain.handle('documents:delete', async (event, id) => {
+  ipcMain.handle('documents:delete', async (event, args) => {
     try {
-      const ok = docService.deleteDocument(id);
+      const id = typeof args === 'object' && args !== null ? args.id : args;
+      const permanent = typeof args === 'object' && args !== null ? Boolean(args.permanent) : false;
+      const ok = docService.deleteDocument(id, permanent);
+      archiveService.log('INFO', 'Documents', `تم ${permanent ? 'حذف الوثيقة نهائياً' : 'نقل الوثيقة لسلة المهملات'} #${id}`);
       return { success: ok };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('documents:restore', async (event, id) => {
+    try {
+      const ok = docService.restoreDocument(id);
+      archiveService.log('INFO', 'Documents', `تمت استعادة الوثيقة #${id} من سلة المهملات`);
+      return { success: ok };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  // Trash Lifecycle
+  ipcMain.handle('trash:list', async (event, params = {}) => {
+    try {
+      return docService.listTrash(params);
+    } catch (err) {
+      return { count: 0, results: [], error: err.message };
+    }
+  });
+
+  ipcMain.handle('trash:purge', async () => {
+    try {
+      const count = docService.purgeTrash();
+      archiveService.log('INFO', 'Documents', `تم تفريغ سلة المهملات بالكامل (${count} وثيقة)`);
+      return { success: true, count };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  // Bulk Operations
+  ipcMain.handle('documents:bulk-delete', async (event, { ids, permanent = false }) => {
+    try {
+      const count = docService.bulkDelete(ids, permanent);
+      archiveService.log('INFO', 'Documents', `إجراء جماعي: ${permanent ? 'حذف نهائي' : 'نقل لسلة المهملات'} لـ ${count} وثيقة`);
+      return { success: true, count };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('documents:bulk-restore', async (event, ids) => {
+    try {
+      const count = docService.bulkRestore(ids);
+      archiveService.log('INFO', 'Documents', `إجراء جماعي: استعادة ${count} وثيقة من المهملات`);
+      return { success: true, count };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('documents:bulk-add-tag', async (event, { ids, tagId }) => {
+    try {
+      const count = docService.bulkAddTag(ids, tagId);
+      return { success: true, count };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('documents:bulk-remove-tag', async (event, { ids, tagId }) => {
+    try {
+      const count = docService.bulkRemoveTag(ids, tagId);
+      return { success: true, count };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('documents:bulk-approve', async (event, ids) => {
+    try {
+      const count = docService.bulkApprove(ids);
+      return { success: true, count };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('documents:bulk-set-type', async (event, { ids, typeId }) => {
+    try {
+      const count = docService.bulkSetType(ids, typeId);
+      return { success: true, count };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('documents:bulk-set-correspondent', async (event, { ids, correspondentId }) => {
+    try {
+      const count = docService.bulkSetCorrespondent(ids, correspondentId);
+      return { success: true, count };
     } catch (err) {
       return { success: false, error: err.message };
     }
@@ -152,29 +252,61 @@ function setupNativeIpcHandlers(appDataDir) {
     }
   });
 
-  ipcMain.handle('documents:get-tags', async () => {
-    try {
-      return docService.getTags();
-    } catch (err) {
-      return { count: 0, results: [] };
-    }
-  });
+  // Classification CRUD
+  ipcMain.handle('classification:tags:list', async () => classification.listTags());
+  ipcMain.handle('classification:tags:create', async (event, data) => classification.createTag(data));
+  ipcMain.handle('classification:tags:update', async (event, { id, patch }) => classification.updateTag(id, patch));
+  ipcMain.handle('classification:tags:delete', async (event, id) => ({ success: classification.deleteTag(id) }));
 
-  ipcMain.handle('documents:get-types', async () => {
-    try {
-      return docService.getDocumentTypes();
-    } catch (err) {
-      return { count: 0, results: [] };
-    }
-  });
+  ipcMain.handle('classification:correspondents:list', async () => classification.listCorrespondents());
+  ipcMain.handle('classification:correspondents:create', async (event, data) => classification.createCorrespondent(data));
+  ipcMain.handle('classification:correspondents:update', async (event, { id, patch }) => classification.updateCorrespondent(id, patch));
+  ipcMain.handle('classification:correspondents:delete', async (event, id) => ({ success: classification.deleteCorrespondent(id) }));
 
-  ipcMain.handle('documents:get-custom-fields', async () => {
-    try {
-      return docService.getCustomFields();
-    } catch (err) {
-      return { count: 0, results: [] };
-    }
-  });
+  ipcMain.handle('classification:types:list', async () => classification.listDocumentTypes());
+  ipcMain.handle('classification:types:create', async (event, data) => classification.createDocumentType(data));
+  ipcMain.handle('classification:types:update', async (event, { id, patch }) => classification.updateDocumentType(id, patch));
+  ipcMain.handle('classification:types:delete', async (event, id) => ({ success: classification.deleteDocumentType(id) }));
+
+  ipcMain.handle('classification:storage-paths:list', async () => classification.listStoragePaths());
+  ipcMain.handle('classification:storage-paths:create', async (event, data) => classification.createStoragePath(data));
+  ipcMain.handle('classification:storage-paths:update', async (event, { id, patch }) => classification.updateStoragePath(id, patch));
+  ipcMain.handle('classification:storage-paths:delete', async (event, id) => ({ success: classification.deleteStoragePath(id) }));
+
+  ipcMain.handle('classification:custom-fields:list', async () => classification.listCustomFields());
+  ipcMain.handle('classification:custom-fields:create', async (event, data) => classification.createCustomField(data));
+  ipcMain.handle('classification:custom-fields:update', async (event, { id, patch }) => classification.updateCustomField(id, patch));
+  ipcMain.handle('classification:custom-fields:delete', async (event, id) => ({ success: classification.deleteCustomField(id) }));
+
+  // Backward-compatible metadata channels
+  ipcMain.handle('documents:get-tags', async () => classification.listTags());
+  ipcMain.handle('documents:get-types', async () => classification.listDocumentTypes());
+  ipcMain.handle('documents:get-custom-fields', async () => classification.listCustomFields());
+  ipcMain.handle('documents:get-correspondents', async () => classification.listCorrespondents());
+  ipcMain.handle('documents:get-storage-paths', async () => classification.listStoragePaths());
+
+  // Saved Views
+  ipcMain.handle('saved-views:list', async () => archiveService.listSavedViews());
+  ipcMain.handle('saved-views:get', async (event, id) => archiveService.getSavedView(id));
+  ipcMain.handle('saved-views:create', async (event, data) => archiveService.createSavedView(data));
+  ipcMain.handle('saved-views:update', async (event, { id, patch }) => archiveService.updateSavedView(id, patch));
+  ipcMain.handle('saved-views:delete', async (event, id) => ({ success: archiveService.deleteSavedView(id) }));
+
+  // Workflows
+  ipcMain.handle('workflows:list', async () => archiveService.listWorkflows());
+  ipcMain.handle('workflows:get', async (event, id) => archiveService.getWorkflow(id));
+  ipcMain.handle('workflows:create', async (event, data) => archiveService.createWorkflow(data));
+  ipcMain.handle('workflows:update', async (event, { id, patch }) => archiveService.updateWorkflow(id, patch));
+  ipcMain.handle('workflows:delete', async (event, id) => ({ success: archiveService.deleteWorkflow(id) }));
+
+  // Tasks & Logs
+  ipcMain.handle('tasks:list', async (event, limit) => archiveService.listTasks(limit));
+  ipcMain.handle('logs:list', async (event, filter) => archiveService.listLogs(filter));
+  ipcMain.handle('logs:clear', async () => ({ success: archiveService.clearLogs() }));
+
+  // Users
+  ipcMain.handle('users:list', async () => archiveService.listUsers());
+  ipcMain.handle('users:update', async (event, { id, patch }) => archiveService.updateUser(id, patch));
 
   ipcMain.handle('documents:check-duplicate', async (event, checksum) => {
     try {

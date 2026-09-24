@@ -246,31 +246,144 @@
               <input id="docsSearchInput" type="text" placeholder="البحث في نص المستندات، العناوين، أو رقم القيد...">
             </div>
 
-            <div style="display: flex; align-items: center; gap: 10px;">
+            <!-- Saved Views & Sort Controls -->
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <select id="savedViewsSelect" class="form-select" style="min-width: 130px; padding: 6px 10px; font-size: 12px;">
+                <option value="">طرق العرض...</option>
+              </select>
+              <button id="btnSaveCurrentView" class="btn-secondary" title="حفظ العرض الحالي" style="padding: 6px 10px; font-size: 12px;">
+                <svg style="width: 14px; height: 14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+              </button>
+
+              <select id="docsSortSelect" class="form-select" style="min-width: 130px; padding: 6px 10px; font-size: 12px;">
+                <option value="-created">الأحدث تاريخاً</option>
+                <option value="created">الأقدم تاريخاً</option>
+                <option value="title">العنوان أ - ي</option>
+                <option value="-title">العنوان ي - أ</option>
+                <option value="id">رقم المستند تصاعدي</option>
+                <option value="-id">رقم المستند تنازلي</option>
+              </select>
+
               <span id="docsCountBadge" class="status-pill online">0 وثيقة</span>
+
+              <!-- View Switcher (Grid, Table, List) -->
               <div style="display: flex; background: var(--bg-surface-elevated); border-radius: var(--radius-md); padding: 2px;">
-                <button id="btnViewGrid" class="icon-btn active" title="عرض الشبكة">
+                <button id="btnViewGrid" class="icon-btn active" title="عرض الشبكة (Grid)">
                   <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
                 </button>
-                <button id="btnViewList" class="icon-btn" title="عرض القائمة">
+                <button id="btnViewTable" class="icon-btn" title="عرض الجدول (Table)">
+                  <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                </button>
+                <button id="btnViewList" class="icon-btn" title="عرض القائمة (List)">
                   <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
                 </button>
               </div>
             </div>
           </div>
 
-          <!-- Department Filters -->
-          <div class="department-filter-pills">
-            <button class="filter-pill active" data-department="الكل">كافة الأقسام</button>
-            <button class="filter-pill" data-department="شخصي">شخصي</button>
-            <button class="filter-pill" data-department="الرنين">الرنين</button>
-            <button class="filter-pill" data-department="تناسق">تناسق</button>
-            <button class="filter-pill" data-department="NAS FM">NAS FM</button>
+          <!-- Multi-filter bar with active filter dropdowns -->
+          <div class="archive-filter-bar">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+              <!-- Department Filters -->
+              <div class="department-filter-pills" style="margin-bottom: 0;">
+                <button class="filter-pill active" data-department="الكل">كافة الأقسام</button>
+                <button class="filter-pill" data-department="شخصي">شخصي</button>
+                <button class="filter-pill" data-department="الرنين">الرنين</button>
+                <button class="filter-pill" data-department="تناسق">تناسق</button>
+                <button class="filter-pill" data-department="NAS FM">NAS FM</button>
+              </div>
+
+              <!-- Filter Dropdown Triggers -->
+              <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                <div class="filter-dropdown-wrapper">
+                  <button id="btnFilterTags" class="btn-secondary filter-dropdown-btn">الوسوم ▾</button>
+                  <div id="menuFilterTags" class="filter-dropdown-menu"></div>
+                </div>
+
+                <div class="filter-dropdown-wrapper">
+                  <button id="btnFilterCorr" class="btn-secondary filter-dropdown-btn">المراسل / الجهة ▾</button>
+                  <div id="menuFilterCorr" class="filter-dropdown-menu"></div>
+                </div>
+
+                <div class="filter-dropdown-wrapper">
+                  <button id="btnFilterType" class="btn-secondary filter-dropdown-btn">نوع المستند ▾</button>
+                  <div id="menuFilterType" class="filter-dropdown-menu"></div>
+                </div>
+
+                <div class="filter-dropdown-wrapper">
+                  <button id="btnFilterPath" class="btn-secondary filter-dropdown-btn">مسار التخزين ▾</button>
+                  <div id="menuFilterPath" class="filter-dropdown-menu"></div>
+                </div>
+
+                <div class="filter-dropdown-wrapper">
+                  <button id="btnFilterDates" class="btn-secondary filter-dropdown-btn">التاريخ ▾</button>
+                  <div id="menuFilterDates" class="filter-dropdown-menu">
+                    <div class="filter-menu-item active" data-range="all">كافة التواريخ</div>
+                    <div class="filter-menu-item" data-range="today">اليوم</div>
+                    <div class="filter-menu-item" data-range="week">آخر 7 أيام</div>
+                    <div class="filter-menu-item" data-range="month">آخر 30 يوماً</div>
+                    <div class="filter-menu-item" data-range="year">هذا العام</div>
+                  </div>
+                </div>
+
+                <div class="filter-dropdown-wrapper">
+                  <button id="btnFilterStatus" class="btn-secondary filter-dropdown-btn">حالة الاعتماد ▾</button>
+                  <div id="menuFilterStatus" class="filter-dropdown-menu">
+                    <div class="filter-menu-item active" data-status="all">الكل</div>
+                    <div class="filter-menu-item" data-status="approved">معتمد فقط</div>
+                    <div class="filter-menu-item" data-status="pending">بانتظار المراجعة</div>
+                  </div>
+                </div>
+
+                <button id="btnResetFilters" class="btn-secondary" style="color: #ef4444; border-color: rgba(239,68,68,0.2); font-size: 12px; display: none;">إعادة تعيين الفلاتر</button>
+              </div>
+            </div>
+
+            <!-- Active filter chips -->
+            <div id="activeFilterChips" class="active-chips-container"></div>
+          </div>
+
+          <!-- Bulk Selection & Action Bar -->
+          <div id="bulkActionsBar" class="bulk-actions-bar" style="display: none;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span id="bulkSelectedCount" style="font-weight: 700; font-size: 13px;">تم تحديد 0 عنصر</span>
+              <div style="display: flex; gap: 6px;">
+                <button id="btnSelectPage" class="btn-secondary" style="padding: 4px 10px; font-size: 11px;">تحديد الصفحة</button>
+                <button id="btnSelectAll" class="btn-secondary" style="padding: 4px 10px; font-size: 11px;">تحديد الكل</button>
+                <button id="btnClearSelection" class="btn-secondary" style="padding: 4px 10px; font-size: 11px;">إلغاء التحديد</button>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 8px;">
+              <button id="btnBulkApprove" class="btn-secondary" style="color: #10b981; border-color: rgba(16,185,129,0.3); padding: 5px 12px; font-size: 12px;">اعتماد المحدد</button>
+              <button id="btnBulkAddTag" class="btn-secondary" style="padding: 5px 12px; font-size: 12px;">إضافة وسم...</button>
+              <button id="btnBulkDelete" class="btn-secondary" style="color: #ef4444; border-color: rgba(239,68,68,0.3); padding: 5px 12px; font-size: 12px;">حذف المحدد</button>
+            </div>
           </div>
         </div>
 
         <div class="docs-content">
-          <div id="docsGrid" class="docs-grid"></div>
+          <div id="docsContainer" style="width: 100%; height: 100%;">
+            <div id="docsGrid" class="docs-grid"></div>
+            <div id="docsTableContainer" class="docs-table-container" style="display: none;">
+              <table class="docs-table">
+                <thead>
+                  <tr>
+                    <th style="width: 40px;"><input type="checkbox" id="thSelectAll"></th>
+                    <th>العنوان</th>
+                    <th>القسم</th>
+                    <th>النوع</th>
+                    <th>الجهة / المراسل</th>
+                    <th>التاريخ</th>
+                    <th>الوسوم</th>
+                    <th style="width: 90px;">الإجراءات</th>
+                  </tr>
+                </thead>
+                <tbody id="docsTableBody"></tbody>
+              </table>
+            </div>
+            <div id="docsListContainer" class="docs-list-container" style="display: none;"></div>
+          </div>
         </div>
       </section>
 
@@ -478,12 +591,170 @@
           </div>
         </div>
       </section>
+ 
+      <!-- ========================================== -->
+      <!-- VIEW: CLASSIFICATION ATTRIBUTES            -->
+      <!-- ========================================== -->
+      <section id="viewAttributes" class="view-pane">
+        <div class="dashboard-container" style="max-width: 1000px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div>
+              <div class="pane-title" style="margin-bottom: 4px;">إدارة السمات والتصنيفات (Attributes)</div>
+              <div style="font-size: 12px; color: var(--text-secondary);">إدارة الوسوم، جهات المراسلة، أنواع المستندات، مسارات التخزين والحقول المخصصة.</div>
+            </div>
+            <button id="btnAddAttribute" class="btn-primary" style="padding: 8px 16px; font-size: 13px;">
+              <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              <span>إضافة عنصر جديد</span>
+            </button>
+          </div>
+
+          <!-- Attributes Tab Navigation -->
+          <div class="attributes-tabs">
+            <button class="attributes-tab-btn active" data-tab="tags">الوسوم (Tags)</button>
+            <button class="attributes-tab-btn" data-tab="correspondents">المراسلون والجهات (Correspondents)</button>
+            <button class="attributes-tab-btn" data-tab="types">أنواع المستندات (Document Types)</button>
+            <button class="attributes-tab-btn" data-tab="storage_paths">مسارات التخزين (Storage Paths)</button>
+            <button class="attributes-tab-btn" data-tab="custom_fields">الحقول المخصصة (Custom Fields)</button>
+          </div>
+
+          <!-- Table Container -->
+          <div class="docs-table-container" style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); overflow: hidden; margin-top: 14px;">
+            <table class="docs-table">
+              <thead id="attributesTableHeader"></thead>
+              <tbody id="attributesTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- VIEW: SAVED VIEWS                          -->
+      <!-- ========================================== -->
+      <section id="viewSavedViews" class="view-pane">
+        <div class="dashboard-container" style="max-width: 900px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div>
+              <div class="pane-title" style="margin-bottom: 4px;">طرق العرض المحفوظة (Saved Views)</div>
+              <div style="font-size: 12px; color: var(--text-secondary);">الوصول السريع إلى التصفية والفرز المخصص للأرشيف.</div>
+            </div>
+            <button id="btnAddSavedView" class="btn-primary" style="padding: 8px 16px; font-size: 13px;">
+              <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              <span>حفظ العرض الحالي</span>
+            </button>
+          </div>
+          <div id="savedViewsList" style="display: flex; flex-direction: column; gap: 12px;"></div>
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- VIEW: WORKFLOWS AUTOMATION                 -->
+      <!-- ========================================== -->
+      <section id="viewWorkflows" class="view-pane">
+        <div class="dashboard-container" style="max-width: 900px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div>
+              <div class="pane-title" style="margin-bottom: 4px;">سير العمل وقواعد الأتمتة (Workflows)</div>
+              <div style="font-size: 12px; color: var(--text-secondary);">قواعد التصنيف التلقائي والتوجيه عند إضافة أو استيراد وثائق جديدة.</div>
+            </div>
+            <button id="btnAddWorkflow" class="btn-primary" style="padding: 8px 16px; font-size: 13px;">
+              <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+              <span>إضافة سير عمل جديد</span>
+            </button>
+          </div>
+          <div id="workflowsList" style="display: flex; flex-direction: column; gap: 12px;"></div>
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- VIEW: TRASH & SOFT-DELETE                  -->
+      <!-- ========================================== -->
+      <section id="viewTrash" class="view-pane">
+        <div class="dashboard-container" style="max-width: 1000px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div>
+              <div class="pane-title" style="margin-bottom: 4px;">سلة المهملات (Trash)</div>
+              <div style="font-size: 12px; color: var(--text-secondary);">المستندات المحذوفة مؤقتاً يمكن استعادتها للأرشيف أو حذفها نهائياً.</div>
+            </div>
+            <button id="btnEmptyTrash" class="btn-secondary" style="color: #ef4444; border-color: rgba(239,68,68,0.3); padding: 8px 16px; font-size: 13px;">
+              <svg style="width: 16px; height: 16px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              <span>تفريغ السلة بالكامل</span>
+            </button>
+          </div>
+          <div class="docs-table-container" style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); overflow: hidden;">
+            <table class="docs-table">
+              <thead>
+                <tr>
+                  <th style="width: 70px;">الرقم</th>
+                  <th>عنوان الوثيقة</th>
+                  <th>تاريخ الحذف</th>
+                  <th>الصفحات</th>
+                  <th style="width: 170px;">الإجراءات</th>
+                </tr>
+              </thead>
+              <tbody id="trashTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- VIEW: TASKS LOG                            -->
+      <!-- ========================================== -->
+      <section id="viewTasks" class="view-pane">
+        <div class="dashboard-container" style="max-width: 1000px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div class="pane-title" style="margin-bottom: 0;">المهام الخلفية ومعالجة الأرشيف (Background Tasks)</div>
+            <button id="btnRefreshTasks" class="btn-secondary" style="padding: 6px 14px; font-size: 12px;">تحديث المهام</button>
+          </div>
+          <div class="docs-table-container" style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); overflow: hidden;">
+            <table class="docs-table">
+              <thead>
+                <tr>
+                  <th style="width: 70px;">الرقم</th>
+                  <th>نوع المهمة</th>
+                  <th>الحالة</th>
+                  <th>الرسالة / التفاصيل</th>
+                  <th>وقت الإنشاء</th>
+                </tr>
+              </thead>
+              <tbody id="tasksTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- VIEW: SYSTEM LOGS                          -->
+      <!-- ========================================== -->
+      <section id="viewLogs" class="view-pane">
+        <div class="dashboard-container" style="max-width: 1000px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <div class="pane-title" style="margin-bottom: 0;">سجلات النظام والتدقيق (System Logs)</div>
+            <div style="display: flex; gap: 10px;">
+              <button id="btnRefreshLogs" class="btn-secondary" style="padding: 6px 14px; font-size: 12px;">تحديث السجلات</button>
+              <button id="btnClearLogs" class="btn-secondary" style="color: #ef4444; padding: 6px 14px; font-size: 12px;">مسح السجلات</button>
+            </div>
+          </div>
+          <div id="logsContainer" style="background: var(--bg-surface-elevated); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 16px; height: 500px; overflow-y: auto;"></div>
+        </div>
+      </section>
+
+      <!-- ========================================== -->
+      <!-- VIEW: LOCAL USERS                          -->
+      <!-- ========================================== -->
+      <section id="viewUsers" class="view-pane">
+        <div class="dashboard-container" style="max-width: 800px;">
+          <div class="pane-title">المستخدمون المحليون (Local Users)</div>
+          <div id="usersListContainer" style="display: flex; flex-direction: column; gap: 12px; margin-top: 16px;"></div>
+        </div>
+      </section>
 
     </main>
 
     <!-- Sidebar Navigation on Right (RTL) -->
     <aside class="sidebar">
       <div class="nav-group">
+        <div class="nav-group-title" style="font-size: 11px; font-weight: 700; color: var(--text-muted); padding: 8px 12px 4px 12px;">مساحة العمل</div>
         <a href="#" class="nav-item" data-view="dashboard">
           <div class="nav-item-content">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
@@ -498,6 +769,16 @@
           </div>
         </a>
 
+        <a href="#" class="nav-item" data-view="import">
+          <div class="nav-item-content">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+            <span>استيراد ملف</span>
+          </div>
+        </a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-title" style="font-size: 11px; font-weight: 700; color: var(--text-muted); padding: 8px 12px 4px 12px;">الأرشيف</div>
         <a href="#" class="nav-item" data-view="documents">
           <div class="nav-item-content">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
@@ -505,23 +786,69 @@
           </div>
         </a>
 
-        <a href="#" class="nav-item" data-view="import">
-          <div class="nav-item-content">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
-            <span>استيراد ملف</span>
-          </div>
-        </a>
-
-        <a href="#" class="nav-item" data-view="documents" onclick="if(window.documentsController){window.documentsController.currentDepartment='الكل';window.documentsController.searchQuery='بانتظار المراجعة';window.documentsController.fetchDocuments();}">
+        <a href="#" class="nav-item" data-view="documents" onclick="if(window.documentsController){window.documentsController.currentDepartment='الكل';window.documentsController.selectedApprovalStatus='pending';window.documentsController.fetchDocuments();}">
           <div class="nav-item-content">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
             <span>بانتظار المراجعة</span>
           </div>
           <span id="badgePendingReview" class="badge" style="display: none;">0</span>
         </a>
+
+        <a href="#" class="nav-item" data-view="savedViews">
+          <div class="nav-item-content">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
+            <span>طرق العرض المحفوظة</span>
+          </div>
+        </a>
+
+        <a href="#" class="nav-item" data-view="trash">
+          <div class="nav-item-content">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            <span>سلة المهملات</span>
+          </div>
+        </a>
       </div>
 
       <div class="nav-group">
+        <div class="nav-group-title" style="font-size: 11px; font-weight: 700; color: var(--text-muted); padding: 8px 12px 4px 12px;">إدارة البيانات</div>
+        <a href="#" class="nav-item" data-view="attributes">
+          <div class="nav-item-content">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/></svg>
+            <span>التصنيفات والسمات</span>
+          </div>
+        </a>
+
+        <a href="#" class="nav-item" data-view="workflows">
+          <div class="nav-item-content">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            <span>سير العمل والتشغيل الآلي</span>
+          </div>
+        </a>
+      </div>
+
+      <div class="nav-group">
+        <div class="nav-group-title" style="font-size: 11px; font-weight: 700; color: var(--text-muted); padding: 8px 12px 4px 12px;">النظام</div>
+        <a href="#" class="nav-item" data-view="tasks">
+          <div class="nav-item-content">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+            <span>المهام الخلفية</span>
+          </div>
+        </a>
+
+        <a href="#" class="nav-item" data-view="logs">
+          <div class="nav-item-content">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            <span>سجلات النظام</span>
+          </div>
+        </a>
+
+        <a href="#" class="nav-item" data-view="users">
+          <div class="nav-item-content">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+            <span>المستخدمون</span>
+          </div>
+        </a>
+
         <a href="#" class="nav-item" data-view="settings">
           <div class="nav-item-content">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
@@ -572,9 +899,20 @@
           <div id="editDocDeptTags" style="display: flex; gap: 8px; flex-wrap: wrap;"></div>
         </div>
 
+        <div class="form-row">
+          <div class="form-group">
+            <label class="field-label">نوع المستند:</label>
+            <select id="editDocType" class="form-select"></select>
+          </div>
+          <div class="form-group">
+            <label class="field-label">المراسل / الجهة:</label>
+            <select id="editDocCorrespondent" class="form-select"></select>
+          </div>
+        </div>
+
         <div class="form-group">
-          <label class="field-label">نوع المستند:</label>
-          <select id="editDocType" class="form-select"></select>
+          <label class="field-label">مسار التخزين:</label>
+          <select id="editDocStoragePath" class="form-select"></select>
         </div>
 
         <!-- Custom Fields -->
@@ -598,10 +936,12 @@
   </div>
 
   <!-- Scripts -->
+  <script src="js/notifications.js"></script>
   <script src="js/api.js"></script>
   <script src="js/pdf_viewer.js"></script>
   <script src="js/scanner.js"></script>
   <script src="js/documents.js"></script>
+  <script src="js/archive_extended.js"></script>
   <script src="js/import.js"></script>
   <script src="js/dashboard.js"></script>
   <script src="js/settings.js"></script>

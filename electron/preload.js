@@ -34,16 +34,100 @@ contextBridge.exposeInMainWorld('nasArchive', {
     list: (params) => ipcRenderer.invoke('documents:list', params),
     get: (id) => ipcRenderer.invoke('documents:get', id),
     update: (id, patch) => ipcRenderer.invoke('documents:update', { id, patch }),
-    delete: (id) => ipcRenderer.invoke('documents:delete', id),
+    delete: (id, permanent = false) => ipcRenderer.invoke('documents:delete', { id, permanent }),
+    restore: (id) => ipcRenderer.invoke('documents:restore', id),
+    bulkDelete: (ids, permanent = false) => ipcRenderer.invoke('documents:bulk-delete', { ids, permanent }),
+    bulkRestore: (ids) => ipcRenderer.invoke('documents:bulk-restore', ids),
+    bulkAddTag: (ids, tagId) => ipcRenderer.invoke('documents:bulk-add-tag', { ids, tagId }),
+    bulkRemoveTag: (ids, tagId) => ipcRenderer.invoke('documents:bulk-remove-tag', { ids, tagId }),
+    bulkApprove: (ids) => ipcRenderer.invoke('documents:bulk-approve', ids),
+    bulkSetType: (ids, typeId) => ipcRenderer.invoke('documents:bulk-set-type', { ids, typeId }),
+    bulkSetCorrespondent: (ids, correspondentId) => ipcRenderer.invoke('documents:bulk-set-correspondent', { ids, correspondentId }),
     readBinary: (id) => ipcRenderer.invoke('documents:read-binary', id),
     exportFile: (id) => ipcRenderer.invoke('documents:export-file', id),
     getTags: () => ipcRenderer.invoke('documents:get-tags'),
     getDocumentTypes: () => ipcRenderer.invoke('documents:get-types'),
     getCustomFields: () => ipcRenderer.invoke('documents:get-custom-fields'),
+    getCorrespondents: () => ipcRenderer.invoke('documents:get-correspondents'),
+    getStoragePaths: () => ipcRenderer.invoke('documents:get-storage-paths'),
     checkDuplicate: (checksum) => ipcRenderer.invoke('documents:check-duplicate', checksum),
     importStage: (filename, fileDataB64, section) => ipcRenderer.invoke('documents:import-stage', { filename, fileDataB64, section }),
     discardStaged: (filename) => ipcRenderer.invoke('documents:discard-staged', filename),
     archiveStage: (options) => ipcRenderer.invoke('archive:stage', options),
+  },
+
+  // Trash Lifecycle
+  trash: {
+    list: (params) => ipcRenderer.invoke('trash:list', params),
+    restore: (id) => ipcRenderer.invoke('documents:restore', id),
+    purge: () => ipcRenderer.invoke('trash:purge'),
+  },
+
+  // Classification & Attributes CRUD
+  classification: {
+    tags: {
+      list: () => ipcRenderer.invoke('classification:tags:list'),
+      create: (data) => ipcRenderer.invoke('classification:tags:create', data),
+      update: (id, patch) => ipcRenderer.invoke('classification:tags:update', { id, patch }),
+      delete: (id) => ipcRenderer.invoke('classification:tags:delete', id),
+    },
+    correspondents: {
+      list: () => ipcRenderer.invoke('classification:correspondents:list'),
+      create: (data) => ipcRenderer.invoke('classification:correspondents:create', data),
+      update: (id, patch) => ipcRenderer.invoke('classification:correspondents:update', { id, patch }),
+      delete: (id) => ipcRenderer.invoke('classification:correspondents:delete', id),
+    },
+    types: {
+      list: () => ipcRenderer.invoke('classification:types:list'),
+      create: (data) => ipcRenderer.invoke('classification:types:create', data),
+      update: (id, patch) => ipcRenderer.invoke('classification:types:update', { id, patch }),
+      delete: (id) => ipcRenderer.invoke('classification:types:delete', id),
+    },
+    storagePaths: {
+      list: () => ipcRenderer.invoke('classification:storage-paths:list'),
+      create: (data) => ipcRenderer.invoke('classification:storage-paths:create', data),
+      update: (id, patch) => ipcRenderer.invoke('classification:storage-paths:update', { id, patch }),
+      delete: (id) => ipcRenderer.invoke('classification:storage-paths:delete', id),
+    },
+    customFields: {
+      list: () => ipcRenderer.invoke('classification:custom-fields:list'),
+      create: (data) => ipcRenderer.invoke('classification:custom-fields:create', data),
+      update: (id, patch) => ipcRenderer.invoke('classification:custom-fields:update', { id, patch }),
+      delete: (id) => ipcRenderer.invoke('classification:custom-fields:delete', id),
+    },
+  },
+
+  // Saved Views
+  savedViews: {
+    list: () => ipcRenderer.invoke('saved-views:list'),
+    get: (id) => ipcRenderer.invoke('saved-views:get', id),
+    create: (data) => ipcRenderer.invoke('saved-views:create', data),
+    update: (id, patch) => ipcRenderer.invoke('saved-views:update', { id, patch }),
+    delete: (id) => ipcRenderer.invoke('saved-views:delete', id),
+  },
+
+  // Workflows
+  workflows: {
+    list: () => ipcRenderer.invoke('workflows:list'),
+    get: (id) => ipcRenderer.invoke('workflows:get', id),
+    create: (data) => ipcRenderer.invoke('workflows:create', data),
+    update: (id, patch) => ipcRenderer.invoke('workflows:update', { id, patch }),
+    delete: (id) => ipcRenderer.invoke('workflows:delete', id),
+  },
+
+  // Tasks & Logs
+  tasks: {
+    list: (limit) => ipcRenderer.invoke('tasks:list', limit),
+  },
+  logs: {
+    list: (filter) => ipcRenderer.invoke('logs:list', filter),
+    clear: () => ipcRenderer.invoke('logs:clear'),
+  },
+
+  // Local Users
+  users: {
+    list: () => ipcRenderer.invoke('users:list'),
+    update: (id, patch) => ipcRenderer.invoke('users:update', { id, patch }),
   },
 
   // Scanner Hardware & Operations

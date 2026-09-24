@@ -168,6 +168,135 @@ const MIGRATIONS = [
       insertField.run(10, 'تاريخ المراجعة', 'date', now);
     },
   },
+  {
+    version: 2,
+    description: 'Restore full Paperless archive features: soft delete, storage paths, saved views, workflows, tasks, logs, and users',
+    up: (db) => {
+      const now = new Date().toISOString();
+
+      // 1. Soft Delete & Storage Path link in documents
+      try {
+        db.exec('ALTER TABLE documents ADD COLUMN deleted_at TEXT DEFAULT NULL;');
+      } catch (e) {
+        // column may already exist
+      }
+      try {
+        db.exec('ALTER TABLE documents ADD COLUMN storage_path_id INTEGER REFERENCES storage_paths(id) ON DELETE SET NULL;');
+      } catch (e) {
+        // column may already exist
+      }
+
+      db.exec('CREATE INDEX IF NOT EXISTS idx_docs_deleted_at ON documents(deleted_at);');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_docs_storage_path ON documents(storage_path_id);');
+
+      // 2. Storage Paths Table
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS storage_paths (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL UNIQUE,
+          path_template TEXT NOT NULL,
+          matching_algorithm TEXT DEFAULT 'auto',
+          match_pattern TEXT,
+          created_at TEXT NOT NULL
+        );
+      `);
+
+      // 3. Saved Views Table
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS saved_views (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL UNIQUE,
+          show_on_dashboard INTEGER DEFAULT 0,
+          show_in_sidebar INTEGER DEFAULT 1,
+          sort_field TEXT DEFAULT 'created_date',
+          sort_reverse INTEGER DEFAULT 1,
+          filter_rules_json TEXT,
+          view_mode TEXT DEFAULT 'grid',
+          created_at TEXT NOT NULL
+        );
+      `);
+
+      // 4. Workflows Table
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS workflows (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL UNIQUE,
+          trigger_type TEXT DEFAULT 'consumption',
+          criteria_json TEXT,
+          actions_json TEXT,
+          is_active INTEGER DEFAULT 1,
+          created_at TEXT NOT NULL
+        );
+      `);
+
+      // 5. App Tasks Table
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS app_tasks (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          task_type TEXT NOT NULL,
+          status TEXT NOT NULL,
+          document_id INTEGER REFERENCES documents(id) ON DELETE SET NULL,
+          message TEXT,
+          created_at TEXT NOT NULL,
+          finished_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_tasks_status ON app_tasks(status);
+      `);
+
+      // 6. App Logs Table
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS app_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          level TEXT DEFAULT 'INFO',
+          source TEXT NOT NULL,
+          message TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_logs_created_at ON app_logs(created_at);
+      `);
+
+      // 7. Local Users Table
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS local_users (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          username TEXT NOT NULL UNIQUE,
+          display_name TEXT,
+          email TEXT,
+          role TEXT DEFAULT 'admin',
+          created_at TEXT NOT NULL
+        );
+      `);
+
+      // 8. Seed Initial Data for Restored Entities
+      const insertUser = db.prepare('INSERT OR IGNORE INTO local_users (id, username, display_name, email, role, created_at) VALUES (?, ?, ?, ?, ?, ?)');
+      insertUser.run(1, 'nasadmin', 'مدير النظام (nasadmin)', 'nasadmin@nasarchive.local', 'admin', now);
+
+      const insertStoragePath = db.prepare('INSERT OR IGNORE INTO storage_paths (id, name, path_template, created_at) VALUES (?, ?, ?, ?)');
+      insertStoragePath.run(1, 'المستودع الرئيسي - حسب القسم والتاريخ', '{department}/{created_year}/{title}', now);
+
+      const insertSavedView = db.prepare('INSERT OR IGNORE INTO saved_views (id, name, show_on_dashboard, show_in_sidebar, sort_field, sort_reverse, filter_rules_json, view_mode, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+      insertSavedView.run(1, 'كافة المستندات', 0, 1, 'created_date', 1, '{}', 'grid', now);
+      insertSavedView.run(2, 'بانتظار المراجعة', 1, 1, 'created_date', 1, '{"inbox_only":true}', 'grid', now);
+      insertSavedView.run(3, 'الكتب الواردة', 0, 1, 'created_date', 1, '{"document_type_id":1}', 'table', now);
+      insertSavedView.run(4, 'المستندات المعتمدة للمزامنة', 0, 0, 'created_date', 1, '{"is_approved_for_sync":true}', 'list', now);
+
+      const insertWorkflow = db.prepare('INSERT OR IGNORE INTO workflows (id, name, trigger_type, criteria_json, actions_json, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)');
+      insertWorkflow.run(1, 'التصنيف التلقائي لكتب الرنين', 'consumption', JSON.stringify({ title_contains: 'الرنين' }), JSON.stringify({ add_tag: 'الرنين' }), 1, now);
+      insertWorkflow.run(2, 'التصنيف التلقائي للكتب الشخصية', 'consumption', JSON.stringify({ title_contains: 'شخصي' }), JSON.stringify({ add_tag: 'شخصي' }), 1, now);
+
+      // Initial system log
+      const insertLog = db.prepare('INSERT INTO app_logs (level, source, message, created_at) VALUES (?, ?, ?, ?)');
+      insertLog.run('INFO', 'Engine', 'تمت ترقية مخطط قاعدة البيانات إلى الإصدار 2 واستعادة وظائف الأرشيف بنجاح.', now);
+    },
+    down: (db) => {
+      db.exec('DROP TABLE IF EXISTS local_users;');
+      db.exec('DROP TABLE IF EXISTS app_logs;');
+      db.exec('DROP TABLE IF EXISTS app_tasks;');
+      db.exec('DROP TABLE IF EXISTS workflows;');
+      db.exec('DROP TABLE IF EXISTS saved_views;');
+      db.exec('DROP TABLE IF EXISTS storage_paths;');
+    },
+  },
 ];
 
 module.exports = {
