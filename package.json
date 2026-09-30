@@ -1,10 +1,13 @@
 {
   "name": "nas-archive",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "NAS Archive Native — نظام الأرشفة الذكي والمسح الضوئي المكتبي المتكامل",
   "main": "electron/main.js",
   "scripts": {
     "start": "electron .",
+    "test": "npm run test:js",
+    "test:js": "node tests/test_archive_restoration_regression.js && node tests/test_scanner_preview_regression.js",
+    "test:native": "node tests/test_native_core.js",
     "build": "electron-builder --dir",
     "dist": "electron-builder --win nsis"
   },

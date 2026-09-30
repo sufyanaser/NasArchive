@@ -161,7 +161,8 @@ def check_paperless_online() -> bool:
 
 def sanitize_filename(filename: str) -> str:
     """Sanitize filename to prevent directory traversal and invalid characters."""
-    base = os.path.basename(unquote(str(filename))).strip()
+    normalized = unquote(str(filename)).replace('\\', '/')
+    base = os.path.basename(normalized).strip()
     safe = re.sub(r'[^a-zA-Z0-9_\-\.\u0600-\u06FF]', '_', base)
     if not safe or safe.startswith('.'):
         safe = f"upload_{int(time.time())}.pdf"
