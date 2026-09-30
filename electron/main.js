@@ -9,6 +9,7 @@ const path = require('path');
 const serviceManager = require('./service_manager');
 const { setupNativeIpcHandlers } = require('./core/ipc_handlers');
 const dbManager = require('./core/db');
+const updater = require('./updater');
 
 // Enforce single instance
 const gotTheLock = app.requestSingleInstanceLock();
@@ -232,6 +233,11 @@ function setupIpcHandlers() {
   // Version & App Info
   ipcMain.handle('app:get-version', () => app.getVersion());
 
+  // Automatic GitHub Release updates
+  ipcMain.handle('updater:get-status', () => updater.getStatus());
+  ipcMain.handle('updater:check', async () => updater.manualCheck());
+  ipcMain.handle('updater:install', () => updater.installDownloaded());
+
   ipcMain.handle('app:open-external', (event, url) => {
     if (typeof url === 'string' && (url.startsWith('http://') || url.startsWith('https://'))) {
       shell.openExternal(url);
@@ -383,6 +389,7 @@ app.whenReady().then(async () => {
         }
         mainWindow.show();
         mainWindow.focus();
+        updater.initialize(mainWindow);
       }, 500);
     });
   }, 200);
@@ -398,6 +405,7 @@ app.whenReady().then(async () => {
 
 app.on('before-quit', () => {
   isQuitting = true;
+  updater.dispose();
   try {
     dbManager.close();
   } catch (e) {}
