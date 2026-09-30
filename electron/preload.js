@@ -8,6 +8,17 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('nasArchive', {
   // Application & Version
   getVersion: () => ipcRenderer.invoke('app:get-version'),
+
+  updater: {
+    getStatus: () => ipcRenderer.invoke('updater:get-status'),
+    check: () => ipcRenderer.invoke('updater:check'),
+    install: () => ipcRenderer.invoke('updater:install'),
+    onStatus: (callback) => {
+      const handler = (event, data) => callback(data);
+      ipcRenderer.on('updater:status', handler);
+      return () => ipcRenderer.removeListener('updater:status', handler);
+    },
+  },
   openExternal: (url) => ipcRenderer.invoke('app:open-external', url),
 
   // Window Controls (macOS-inspired desktop controls)
