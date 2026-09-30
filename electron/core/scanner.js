@@ -161,6 +161,7 @@ class ScannerService {
 
       const args = [
         '-o', tempPath,
+        '--noprofile',
         '--driver', driver,
         '--dpi', String(dpi),
         '--pagesize', 'a4',
@@ -169,8 +170,16 @@ class ScannerService {
         '-v',
       ];
 
-      if (options.device && typeof options.device === 'string' && options.device.trim()) {
-        args.push('--device', options.device.trim());
+      const selectedDevice =
+        typeof options.device === 'string' && options.device.trim()
+          ? options.device.trim()
+          : null;
+
+      // NAPS2 CLI settings-only mode requires --noprofile and an explicit device.
+      // This prevents an unrelated saved GUI profile from overriding the requested
+      // driver/source/device settings.
+      if (selectedDevice) {
+        args.push('--device', selectedDevice);
       }
       if (source) {
         args.push('--source', source);
@@ -190,7 +199,16 @@ class ScannerService {
             if (fs.existsSync(tempPath)) {
               try { fs.unlinkSync(tempPath); } catch (e) {}
             }
-            reject(new Error(`فشل المسح الضوئي: ${error.message} - ${stderr}`));
+            const exitCode = typeof error.code === 'number' ? error.code : 'unknown';
+            const diagnostics = [stderr, stdout]
+              .map((value) => String(value || '').trim())
+              .filter(Boolean)
+              .join(' | ');
+            reject(
+              new Error(
+                `فشل المسح الضوئي عبر NAPS2 (exit code: ${exitCode}). ${diagnostics || error.message}`
+              )
+            );
             return;
           }
 

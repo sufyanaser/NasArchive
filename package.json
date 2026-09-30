@@ -1,6 +1,6 @@
 {
   "name": "nas-archive",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "description": "NAS Archive Native — نظام الأرشفة الذكي والمسح الضوئي المكتبي المتكامل",
   "main": "electron/main.js",
   "scripts": {
@@ -51,13 +51,20 @@
       "src/**/*",
       "assets/**/*",
       "!assets/tessdata/**/*"
-    ]
+    ],
+    "publish": {
+      "provider": "github",
+      "owner": "sufyanaser",
+      "repo": "NasArchive",
+      "releaseType": "release"
+    }
   },
   "devDependencies": {
     "electron": "^44.4.5",
     "electron-builder": "^26.15.3"
   },
   "dependencies": {
-    "pdfjs-dist": "^3.11.174"
+    "pdfjs-dist": "^3.11.174",
+    "electron-updater": "^6.8.9"
   }
 }
