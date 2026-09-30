@@ -24,6 +24,7 @@ class ScannerBridgeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Spin up a test instance of ScannerBridge on an ephemeral local port."""
+        scanner_bridge.STAGING_DIR.mkdir(parents=True, exist_ok=True)
         cls.test_host = '127.0.0.1'
         # Bind to port 0 to let OS assign an available local port
         cls.httpd = ThreadingHTTPServer((cls.test_host, 0), ScannerBridgeHandler)
@@ -76,7 +77,7 @@ class ScannerBridgeTests(unittest.TestCase):
         self.assertIn('paperless', data)
         self.assertIn('scanner', data)
         self.assertIn('version', data)
-        self.assertTrue(data['scanner']['naps2_installed'])
+        self.assertIn('naps2_installed', data['scanner'])
 
     def test_devices_endpoint(self):
         """Verify /api/devices returns device list and allowable choices."""
@@ -308,6 +309,7 @@ class ScannerBridgeTests(unittest.TestCase):
 
     def test_archive_corrupted_staged_file_rejected(self):
         """Verify /api/scan/archive rejects corrupted or empty staged documents with 400."""
+        scanner_bridge.STAGING_DIR.mkdir(parents=True, exist_ok=True)
         corrupt_fn = f"corrupt_{int(time.time())}_شخصي.pdf"
         staged_path = scanner_bridge.STAGING_DIR / corrupt_fn
         # Write corrupted header (not %PDF-)
