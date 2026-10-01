@@ -21,6 +21,7 @@ class DocumentStorage {
     this.dirs = {
       originals: path.join(this.baseDir, 'originals'),
       archive: path.join(this.baseDir, 'archive'),
+      enhanced: path.join(this.baseDir, 'enhanced'),
       staging: path.join(this.baseDir, 'staging'),
       thumbnails: path.join(this.baseDir, 'thumbnails'),
       ocr: path.join(this.baseDir, 'ocr'),
@@ -204,6 +205,29 @@ class DocumentStorage {
 
     return {
       filename: relativeKey,
+      path: targetPath,
+      size: stat.size,
+      checksum,
+    };
+  }
+
+  /**
+   * Store an enhanced derivative PDF separately from the immutable original.
+   */
+  storeEnhanced(docId, sourcePdfPath) {
+    const prefix = String(docId).padStart(7, '0');
+    const storedFilename = `${prefix}_enhanced.pdf`;
+    const targetPath = path.join(this.dirs.enhanced, storedFilename);
+    const tempPath = path.join(this.dirs.enhanced, `.tmp_${Date.now()}_${storedFilename}`);
+
+    fs.copyFileSync(sourcePdfPath, tempPath);
+    fs.renameSync(tempPath, targetPath);
+
+    const stat = fs.statSync(targetPath);
+    const checksum = this.computeFileHash(targetPath);
+
+    return {
+      filename: storedFilename,
       path: targetPath,
       size: stat.size,
       checksum,

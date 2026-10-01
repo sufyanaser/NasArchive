@@ -1,6 +1,7 @@
 /**
  * NAS Archive — Native Backup and Restore Engine
- * Packages SQLite database, originals, archive PDFs, OCR text, and manifest
+ * Packages SQLite database, originals, enhanced derivatives, archive PDFs,
+ * OCR text, and manifest
  * with SHA-256 integrity verification and safe isolated restore capability.
  */
 const fs = require('fs');
@@ -28,9 +29,11 @@ class BackupService {
 
     const originalsDir = path.join(backupDir, 'originals');
     const archiveDir = path.join(backupDir, 'archive');
+    const enhancedDir = path.join(backupDir, 'enhanced');
     const ocrDir = path.join(backupDir, 'ocr');
     fs.mkdirSync(originalsDir, { recursive: true });
     fs.mkdirSync(archiveDir, { recursive: true });
+    fs.mkdirSync(enhancedDir, { recursive: true });
     fs.mkdirSync(ocrDir, { recursive: true });
 
     // 1. Checkpoint WAL and copy SQLite database
@@ -74,6 +77,9 @@ class BackupService {
       }
       if (doc.archive_file_path) {
         copyAndRecord(doc.archive_file_path, archiveDir, 'archive');
+      }
+      if (doc.enhanced_file_path) {
+        copyAndRecord(doc.enhanced_file_path, enhancedDir, 'enhanced');
       }
       // OCR text if exists
       const prefix = String(doc.id).padStart(7, '0');
@@ -208,6 +214,7 @@ class BackupService {
       const srcPath = path.join(backupDir, f.backupRelativePath);
       let targetFolder = storage.dirs.originals;
       if (f.category === 'archive') targetFolder = storage.dirs.archive;
+      if (f.category === 'enhanced') targetFolder = storage.dirs.enhanced;
       if (f.category === 'ocr') targetFolder = storage.dirs.ocr;
 
       const targetPath = path.join(targetFolder, path.basename(srcPath));

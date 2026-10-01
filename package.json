@@ -6,7 +6,7 @@
   "scripts": {
     "start": "electron .",
     "test": "npm run test:js",
-    "test:js": "node tests/test_archive_restoration_regression.js && node tests/test_scanner_preview_regression.js && node tests/test_thumbnail_archive_rules.js",
+    "test:js": "node tests/test_archive_restoration_regression.js && node tests/test_scanner_preview_regression.js && node tests/test_thumbnail_archive_rules.js && node tests/test_document_enhancement.js",
     "test:native": "node tests/test_native_core.js",
     "build": "electron-builder --dir",
     "dist": "electron-builder --win nsis"
@@ -65,7 +65,8 @@
     "electron-builder": "^26.15.3"
   },
   "dependencies": {
+    "electron-updater": "^6.8.9",
     "pdfjs-dist": "^3.11.174",
-    "electron-updater": "^6.8.9"
+    "sharp": "^0.35.5"
   }
 }
