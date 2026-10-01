@@ -1,6 +1,6 @@
 /**
  * NAS Archive — Unified Document Management Controller (Restored & Enhanced)
- * Provides comprehensive document management, full-parity Paperless functionality:
+ * Provides comprehensive native document management:
  * Grid/Table/List views, bulk selection & actions, multi-filter bar with active chips,
  * saved views, sorting, pagination, and split-screen document editor with auto-close on save.
  */

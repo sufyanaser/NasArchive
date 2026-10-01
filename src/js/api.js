@@ -1,7 +1,7 @@
 /**
  * NAS Archive — Unified API Client
- * Primary transport: High-speed Secure Electron IPC (zero localhost ports, zero Docker).
- * Fallback transport: Local HTTP (for standalone headless/testing scenarios).
+ * Transport: secure Electron IPC only. The desktop application does not expose
+ * localhost service ports or depend on a container runtime.
  */
 
 class ApiClient {
@@ -11,32 +11,38 @@ class ApiClient {
 
   // --- System & Service Health ---
   async getStatus() {
-    if (window.nasArchive && window.nasArchive.services) {
-      const health = await window.nasArchive.services.getHealth();
-      const sc = health.scanner || {};
-      const devs = sc.devices || sc.detected_devices || [];
+    if (!window.nasArchive || !window.nasArchive.services) {
       return {
-        paperless: { online: true, version: health.version || '2.0.0 (Native)' },
-        native: { online: true, version: '2.0.0' },
-        bridge: { online: true, port: null },
-        scanner: {
-          detected: devs.length > 0,
-          detected_devices: devs,
-          devices: devs,
-          ready: Boolean(sc.ready && devs.length > 0),
-          status: sc.status || (devs.length > 0 ? 'READY' : 'NO_DEVICES'),
-          activeDevice: sc.activeDevice || (devs.length > 0 ? devs[0] : null),
-        },
-        database: health.database || { ok: true },
-        ocr: health.ocr || { ready: true },
+        native: { online: false },
+        database: { ok: false },
+        ocr: { ready: false },
+        scanner: { detected: false, detected_devices: [], devices: [], ready: false },
       };
     }
-    try {
-      const res = await fetch('http://127.0.0.1:8001/api/status');
-      return await res.json();
-    } catch (e) {
-      return { paperless: { online: true }, native: { online: true }, bridge: { online: true }, scanner: { detected: false, detected_devices: [], devices: [], ready: false } };
-    }
+
+    const health = await window.nasArchive.services.getHealth();
+    const sc = health.scanner || {};
+    const devs = sc.devices || sc.detected_devices || [];
+    const nativeOk = Boolean(
+      health.nativeCore &&
+      (health.nativeCore.ok === undefined || health.nativeCore.ok) &&
+      health.database &&
+      health.database.ok
+    );
+
+    return {
+      native: { online: nativeOk, architecture: health.architecture || 'native' },
+      database: health.database || { ok: false },
+      ocr: health.ocr || { ready: false },
+      scanner: {
+        detected: devs.length > 0,
+        detected_devices: devs,
+        devices: devs,
+        ready: Boolean((sc.ready !== false) && devs.length > 0),
+        status: sc.status || (devs.length > 0 ? 'READY' : 'NO_DEVICES'),
+        activeDevice: sc.activeDevice || (devs.length > 0 ? devs[0] : null),
+      },
+    };
   }
 
   async getDevices(driver = 'wia') {

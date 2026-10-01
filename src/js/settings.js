@@ -12,9 +12,9 @@ class SettingsController {
       defaultSourceSelect: document.getElementById('settingDefaultSource'),
       autoDeskewCheckbox: document.getElementById('settingAutoDeskew'),
 
-      statusDocker: document.getElementById('statusDocker'),
-      statusPaperless: document.getElementById('statusPaperless'),
-      statusBridge: document.getElementById('statusBridge'),
+      statusRuntime: document.getElementById('statusRuntime'),
+      statusNativeCore: document.getElementById('statusNativeCore'),
+      statusDatabase: document.getElementById('statusDatabase'),
       statusScanner: document.getElementById('statusScanner'),
       btnRefreshServices: document.getElementById('btnRefreshServices'),
 
@@ -128,9 +128,15 @@ class SettingsController {
         };
       }
 
-      this._updatePill(this.dom.statusDocker, true, 'يعمل محلياً (بدون Docker)');
-      this._updatePill(this.dom.statusPaperless, true, 'محرك الأرشفة المحلي متصل');
-      this._updatePill(this.dom.statusBridge, true, 'قاعدة بيانات SQLite FTS5 سليمة');
+      const nativeOk = Boolean(
+        health.nativeCore &&
+        (health.nativeCore.ok === undefined || health.nativeCore.ok)
+      );
+      const dbOk = Boolean(health.database && health.database.ok);
+
+      this._updatePill(this.dom.statusRuntime, true, 'تطبيق Windows محلي');
+      this._updatePill(this.dom.statusNativeCore, nativeOk, nativeOk ? 'النواة المحلية جاهزة' : 'النواة المحلية غير جاهزة');
+      this._updatePill(this.dom.statusDatabase, dbOk, dbOk ? 'SQLite FTS5 سليمة' : 'قاعدة البيانات تحتاج فحصاً');
 
       const devs = (health.scanner && health.scanner.detected_devices) || [];
       const devName = devs.length > 0 ? devs[0] : 'لا يوجد جهاز متصل';

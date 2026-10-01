@@ -13,8 +13,8 @@ class DashboardController {
       deptTanasuq: document.getElementById('dashDeptTanasuq'),
       deptNasfm: document.getElementById('dashDeptNasfm'),
       recentDocsList: document.getElementById('dashRecentDocsList'),
-      healthDocker: document.getElementById('dashHealthDocker'),
-      healthPaperless: document.getElementById('dashHealthPaperless'),
+      healthDatabase: document.getElementById('dashHealthDatabase'),
+      healthNative: document.getElementById('dashHealthNative'),
       healthScanner: document.getElementById('dashHealthScanner'),
     };
   }
@@ -99,10 +99,16 @@ class DashboardController {
       }
 
       // Health Indicators
-      if (this.dom.healthPaperless) {
-        const isOnline = healthData.paperless && healthData.paperless.online;
-        this.dom.healthPaperless.className = `status-pill ${isOnline ? 'online' : 'offline'}`;
-        this.dom.healthPaperless.querySelector('span:last-child').textContent = isOnline ? 'متصل' : 'غير متصل';
+      if (this.dom.healthNative) {
+        const isOnline = healthData.native && healthData.native.online;
+        this.dom.healthNative.className = `status-pill ${isOnline ? 'online' : 'offline'}`;
+        this.dom.healthNative.querySelector('span:last-child').textContent = isOnline ? 'النواة المحلية جاهزة' : 'النواة المحلية غير جاهزة';
+      }
+
+      if (this.dom.healthDatabase) {
+        const dbOk = Boolean(healthData.database && healthData.database.ok);
+        this.dom.healthDatabase.className = `status-pill ${dbOk ? 'online' : 'offline'}`;
+        this.dom.healthDatabase.querySelector('span:last-child').textContent = dbOk ? 'SQLite سليمة' : 'SQLite تحتاج فحصاً';
       }
 
       if (this.dom.healthScanner) {

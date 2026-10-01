@@ -25,13 +25,13 @@
     </div>
 
     <div class="titlebar-right">
-      <div id="topPillPaperless" class="status-pill online">
+      <div id="topPillNative" class="status-pill online">
         <span class="status-dot"></span>
         <span>المحرك المحلي متصل</span>
       </div>
       <div id="topPillScanner" class="status-pill online">
         <span class="status-dot"></span>
-        <span>EPSON WF-C5890 Series</span>
+        <span>فحص جهاز المسح</span>
       </div>
     </div>
   </header>
@@ -504,10 +504,11 @@
 
           <!-- Services Health Overview -->
           <div style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 18px;">
-            <div style="font-weight: 700; font-size: 14px; margin-bottom: 14px;">حالة الخدمات المساعدة</div>
+            <div style="font-weight: 700; font-size: 14px; margin-bottom: 14px;">حالة المكونات المحلية</div>
             <div style="display: flex; gap: 14px; flex-wrap: wrap;">
-              <div id="dashHealthPaperless" class="status-pill online"><span class="status-dot"></span><span>Paperless متصل</span></div>
-              <div id="dashHealthScanner" class="status-pill online"><span class="status-dot"></span><span>EPSON WF-C5890 Series</span></div>
+              <div id="dashHealthNative" class="status-pill online"><span class="status-dot"></span><span>النواة المحلية جاهزة</span></div>
+              <div id="dashHealthDatabase" class="status-pill online"><span class="status-dot"></span><span>SQLite سليمة</span></div>
+              <div id="dashHealthScanner" class="status-pill online"><span class="status-dot"></span><span>فحص جهاز المسح</span></div>
             </div>
           </div>
 
@@ -578,15 +579,15 @@
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
               <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: var(--bg-surface-elevated); border-radius: 8px;">
                 <span style="font-size: 13px;">بيئة التشغيل:</span>
-                <span id="statusDocker" class="status-pill online"><span class="status-dot"></span><span>Windows 11 مستقل</span></span>
+                <span id="statusRuntime" class="status-pill online"><span class="status-dot"></span><span>تطبيق Windows محلي</span></span>
               </div>
               <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: var(--bg-surface-elevated); border-radius: 8px;">
                 <span style="font-size: 13px;">المحرك المحلي:</span>
-                <span id="statusPaperless" class="status-pill online"><span class="status-dot"></span><span>جاهز ومتصل</span></span>
+                <span id="statusNativeCore" class="status-pill online"><span class="status-dot"></span><span>النواة المحلية جاهزة</span></span>
               </div>
               <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: var(--bg-surface-elevated); border-radius: 8px;">
                 <span style="font-size: 13px;">قاعدة البيانات:</span>
-                <span id="statusBridge" class="status-pill online"><span class="status-dot"></span><span>SQLite FTS5</span></span>
+                <span id="statusDatabase" class="status-pill online"><span class="status-dot"></span><span>SQLite FTS5</span></span>
               </div>
               <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; background: var(--bg-surface-elevated); border-radius: 8px;">
                 <span style="font-size: 13px;">الماسح الضوئي (WIA):</span>

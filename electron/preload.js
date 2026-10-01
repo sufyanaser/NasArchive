@@ -172,7 +172,7 @@ contextBridge.exposeInMainWorld('nasArchive', {
     restore: (backupDir, confirmDestructive) => ipcRenderer.invoke('backup:restore', { backupDir, confirmDestructive }),
   },
 
-  // Paperless Migration
+  // Legacy archive migration
   migration: {
     run: (exportDir, allowDuplicates) => ipcRenderer.invoke('migration:run', { exportDir, allowDuplicates }),
   },

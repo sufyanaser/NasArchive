@@ -165,16 +165,16 @@ class AppRouter {
   }
 
   _setupLiveHealthPolling() {
-    const pillPaperless = document.getElementById('topPillPaperless');
+    const pillNative = document.getElementById('topPillNative');
     const pillScanner = document.getElementById('topPillScanner');
 
     const updateStatus = async () => {
       try {
         const data = await window.api.getStatus();
-        if (pillPaperless) {
-          const isOnline = (data.native && data.native.online) || (data.paperless && data.paperless.online);
-          pillPaperless.className = `status-pill ${isOnline ? 'online' : 'offline'}`;
-          pillPaperless.querySelector('span:last-child').textContent = isOnline ? 'المحرك المحلي متصل' : 'المحرك المحلي غير متصل';
+        if (pillNative) {
+          const isOnline = data.native && data.native.online;
+          pillNative.className = `status-pill ${isOnline ? 'online' : 'offline'}`;
+          pillNative.querySelector('span:last-child').textContent = isOnline ? 'المحرك المحلي متصل' : 'المحرك المحلي غير متصل';
         }
 
         if (pillScanner) {
@@ -195,7 +195,7 @@ class AppRouter {
           }
         }
       } catch (e) {
-        // bridge offline
+        // native health unavailable
       }
     };
 
