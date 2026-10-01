@@ -10,6 +10,7 @@ const { autoUpdater } = require('electron-updater');
 const UPDATE_INTERVAL_MS = 6 * 60 * 60 * 1000;
 let mainWindow = null;
 let interval = null;
+let startupTimer = null;
 let status = {
   state: 'idle',
   version: null,
@@ -107,7 +108,8 @@ function initialize(window) {
 
   // Delay the first check so startup, database initialization and scanner
   // services are not competing with update I/O.
-  setTimeout(() => {
+  startupTimer = setTimeout(() => {
+    startupTimer = null;
     checkForUpdates();
   }, 10000);
 
@@ -134,6 +136,10 @@ function dispose() {
   if (interval) {
     clearInterval(interval);
     interval = null;
+  }
+  if (startupTimer) {
+    clearTimeout(startupTimer);
+    startupTimer = null;
   }
   mainWindow = null;
 }
