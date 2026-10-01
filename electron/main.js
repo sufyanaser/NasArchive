@@ -72,6 +72,9 @@ function loadPreferences() {
     defaultBitdepth: 'color',
     defaultSource: 'glass',
     autoDeskew: true,
+    archiveStoragePath: path.join(app.getPath('userData'), 'storage'),
+    googleDriveSyncEnabled: false,
+    googleDriveFolderId: '',
   };
 }
 
@@ -300,6 +303,28 @@ function setupIpcHandlers() {
 
   ipcMain.handle('prefs:get-all', () => {
     return loadPreferences();
+  });
+
+  ipcMain.handle('storage:validate-path', (event, targetPath) => {
+    return serviceManager.validateStoragePath(targetPath);
+  });
+
+  ipcMain.handle('storage:select-archive-folder', async () => {
+    if (!mainWindow) return null;
+    const prefs = loadPreferences();
+    const res = await dialog.showOpenDialog(mainWindow, {
+      title: 'اختر مجلد الأرشفة المحلي',
+      defaultPath: prefs.archiveStoragePath || app.getPath('documents'),
+      properties: ['openDirectory', 'createDirectory'],
+      buttonLabel: 'اعتماد هذا المجلد',
+    });
+    if (res.canceled || res.filePaths.length === 0) return null;
+    const selectedPath = res.filePaths[0];
+    const validation = serviceManager.validateStoragePath(selectedPath);
+    if (validation.ok) {
+      savePreference('archiveStoragePath', validation.path);
+    }
+    return validation;
   });
 
   // Native Dialogs

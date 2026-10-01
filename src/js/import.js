@@ -168,25 +168,9 @@ class ImportController {
     }
 
     if (!isValid) {
-      try {
-        const encName = encodeURIComponent(filename);
-        const valRes = await fetch(`http://127.0.0.1:8001/api/staging/${encName}/validate`);
-        if (valRes.ok) {
-          const valJson = await valRes.json();
-          if (valJson.valid) {
-            isValid = true;
-            previewData = `http://127.0.0.1:8001/api/staging/${encName}`;
-          }
-        }
-      } catch (httpErr) {
-        console.warn('HTTP validation error in import:', httpErr);
-      }
-    }
-
-    if (!isValid) {
       this.dom.archiveBtn.disabled = true;
       this.pdfViewer._showError(
-        'الملف المستورد غير متاح أو تالف. يرجى إلغاء الملف واختيار مستند صالح.',
+        'الملف المستورد غير متاح للمعاينة المحلية. يرجى إلغاء الملف واختيار مستند PDF صالح.',
         () => this.loadAndValidatePreview()
       );
       return;
@@ -194,7 +178,7 @@ class ImportController {
 
     this.dom.archiveBtn.disabled = false;
     const retryFn = () => this.loadAndValidatePreview();
-    await this.pdfViewer.loadDocument(previewData || `http://127.0.0.1:8001/api/staging/${encodeURIComponent(filename)}`, retryFn);
+    await this.pdfViewer.loadDocument(previewData, retryFn);
   }
 
   async executeArchive() {

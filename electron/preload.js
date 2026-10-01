@@ -191,6 +191,11 @@ contextBridge.exposeInMainWorld('nasArchive', {
     getAll: () => ipcRenderer.invoke('prefs:get-all'),
   },
 
+  storage: {
+    selectArchiveFolder: () => ipcRenderer.invoke('storage:select-archive-folder'),
+    validatePath: (targetPath) => ipcRenderer.invoke('storage:validate-path', targetPath),
+  },
+
   // Staged Document Access (Direct local IPC without network exposure)
   staging: {
     read: (filename) => ipcRenderer.invoke('staging:read', filename),

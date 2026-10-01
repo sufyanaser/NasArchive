@@ -327,7 +327,7 @@ class ArchiveExtendedController {
             <button class="icon-btn" style="color: #ef4444;" onclick="window.archiveExtended.deleteSavedView(${v.id}, '${v.name}')" title="حذف"><svg style="width:14px;height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 6h18m-2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
           </div>
           <div style="font-size: 12px; color: var(--text-secondary);">
-            نمط العرض: ${v.view_mode === 'table' ? 'جدول' : v.view_mode === 'list' ? 'قائمة' : 'شبكة'} | الترتيب: ${v.sort_field}
+            ${this._viewModeLabel(v.view_mode)} · ${this._sortFieldLabel(v.sort_field)} ${v.sort_reverse ? 'تنازلياً' : 'تصاعدياً'}
           </div>
           <button class="btn-secondary" style="margin-top: 6px; padding: 6px 12px; font-size: 12px;" onclick="window.archiveExtended.applySavedView(${v.id})">تطبيق طريقة العرض هذه</button>
         </div>
@@ -376,7 +376,7 @@ class ArchiveExtendedController {
           <div>
             <div style="font-weight: 700; font-size: 14px;">${w.name}</div>
             <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
-              المعايير: <span class="mono">${JSON.stringify(w.criteria)}</span> ← الإجراءات: <span class="mono">${JSON.stringify(w.actions)}</span>
+              ${this._workflowSummary(w)}
             </div>
           </div>
           <div style="display: flex; gap: 8px; align-items: center;">
@@ -492,8 +492,8 @@ class ArchiveExtendedController {
     body.innerHTML = tasks.map((t) => `
       <tr>
         <td>#${t.id}</td>
-        <td><strong>${t.task_type}</strong></td>
-        <td><span class="status-pill ${t.status === 'SUCCESS' ? 'online' : t.status === 'RUNNING' ? 'warning' : 'offline'}">${t.status}</span></td>
+          <td><strong>${this._taskTypeLabel(t.task_type)}</strong></td>
+          <td><span class="status-pill ${t.status === 'SUCCESS' ? 'online' : t.status === 'RUNNING' ? 'warning' : 'offline'}">${this._taskStatusLabel(t.status)}</span></td>
         <td>${t.message || '—'}</td>
         <td class="ltr">${t.created_at ? t.created_at.slice(11, 19) : '—'}</td>
       </tr>
@@ -519,6 +519,54 @@ class ArchiveExtendedController {
         <span style="color: var(--text-primary); flex: 1;">${l.message}</span>
       </div>
     `).join('');
+  }
+
+  _viewModeLabel(mode) {
+    if (mode === 'table') return 'عرض جدولي';
+    if (mode === 'list') return 'عرض قائمة';
+    return 'عرض شبكي';
+  }
+
+  _sortFieldLabel(field) {
+    const labels = {
+      created_date: 'حسب التاريخ',
+      created: 'حسب تاريخ الإضافة',
+      title: 'حسب العنوان',
+      id: 'حسب رقم الوثيقة',
+    };
+    return labels[field] || 'حسب الترتيب المحفوظ';
+  }
+
+  _workflowSummary(workflow) {
+    const criteria = workflow.criteria || {};
+    const actions = workflow.actions || {};
+    const parts = [];
+    if (criteria.title_contains) parts.push(`عند احتواء العنوان على "${criteria.title_contains}"`);
+    if (actions.add_tag) parts.push(`أضف وسم "${actions.add_tag}"`);
+    if (parts.length === 0) return 'قاعدة محفوظة للتصنيف التلقائي.';
+    return parts.join('، ');
+  }
+
+  _taskTypeLabel(type) {
+    const labels = {
+      scan: 'مسح ضوئي',
+      import: 'استيراد',
+      archive: 'أرشفة',
+      backup: 'نسخ احتياطي',
+      sync: 'مزامنة',
+    };
+    return labels[type] || type || 'مهمة';
+  }
+
+  _taskStatusLabel(status) {
+    const labels = {
+      SUCCESS: 'اكتملت',
+      RUNNING: 'قيد التنفيذ',
+      FAILED: 'فشلت',
+      DUPLICATE: 'مكررة',
+      STAGED_READY: 'جاهزة للمراجعة',
+    };
+    return labels[status] || status || 'غير معروفة';
   }
 
   async clearLogs() {

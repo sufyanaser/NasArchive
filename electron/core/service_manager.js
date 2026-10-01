@@ -17,6 +17,8 @@ class NativeServiceManager {
     this.initialized = false;
     this.storagePath = null;
     this.dbPath = null;
+    this.userDataDir = null;
+    this.projectRoot = null;
   }
 
   /**
@@ -24,12 +26,15 @@ class NativeServiceManager {
    */
   initialize(userDataDir, projectRoot) {
     if (this.initialized) return;
+    this.userDataDir = userDataDir;
+    this.projectRoot = projectRoot;
 
     // Use runtime directory in development or AppData in production
     const isPackaged = process.defaultApp === false || (process.resourcesPath && !process.resourcesPath.includes('node_modules'));
     
     // Choose persistent storage root outside installation directory
-    let baseStorage = path.join(userDataDir, 'storage');
+    const configuredStorage = this._loadConfiguredStoragePath(userDataDir);
+    let baseStorage = configuredStorage || path.join(userDataDir, 'storage');
     // In repo dev mode, check if runtime exists
     if (!isPackaged && projectRoot && fs.existsSync(path.join(projectRoot, 'runtime'))) {
       baseStorage = path.join(projectRoot, 'runtime', 'storage');
@@ -60,6 +65,35 @@ class NativeServiceManager {
     }
 
     this.initialized = true;
+  }
+
+  _loadConfiguredStoragePath(userDataDir) {
+    try {
+      const prefsPath = path.join(userDataDir, 'nas_preferences.json');
+      if (!fs.existsSync(prefsPath)) return null;
+      const prefs = JSON.parse(fs.readFileSync(prefsPath, 'utf-8'));
+      if (!prefs.archiveStoragePath || typeof prefs.archiveStoragePath !== 'string') return null;
+      return path.resolve(prefs.archiveStoragePath);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  validateStoragePath(targetPath) {
+    if (!targetPath || typeof targetPath !== 'string') {
+      return { ok: false, error: 'لم يتم تحديد مجلد صالح للأرشفة.' };
+    }
+
+    try {
+      const resolved = path.resolve(targetPath);
+      fs.mkdirSync(resolved, { recursive: true });
+      const probe = path.join(resolved, `.nas_archive_write_test_${Date.now()}.tmp`);
+      fs.writeFileSync(probe, 'ok', 'utf-8');
+      fs.unlinkSync(probe);
+      return { ok: true, path: resolved };
+    } catch (e) {
+      return { ok: false, path: targetPath, error: e.message };
+    }
   }
 
   /**
@@ -121,17 +155,37 @@ class NativeServiceManager {
       scanners = [];
     }
 
-    const integrity = dbManager.checkIntegrity();
-    const docCount = docService.getCount();
+    let integrity = { ok: false, error: 'لم تتم تهيئة قاعدة البيانات بعد.' };
+    let docCount = 0;
+    try {
+      integrity = dbManager.checkIntegrity();
+      docCount = docService.getCount();
+    } catch (e) {
+      integrity = { ok: false, error: e.message };
+    }
+    const storageCheck = this.storagePath
+      ? this.validateStoragePath(this.storagePath)
+      : { ok: false, error: 'لم يتم تحديد مسار التخزين.' };
+    const coreOk = Boolean(this.storagePath && storageCheck.ok);
 
     return {
       nativeCore: {
-        ok: this.initialized && integrity.ok,
+        ok: coreOk,
+        initialized: this.initialized,
+        status: coreOk ? 'READY' : 'NEEDS_ATTENTION',
         storagePath: this.storagePath,
+        message: coreOk ? 'النواة المحلية جاهزة' : (storageCheck.error || 'النواة المحلية تحتاج فحصاً'),
       },
       database: {
         ok: integrity.ok,
         totalDocs: docCount,
+        path: this.dbPath,
+        error: integrity.error || null,
+      },
+      storage: {
+        ok: storageCheck.ok,
+        path: this.storagePath,
+        error: storageCheck.error || null,
       },
       ocr: {
         ready: Boolean(ocr.tessdataDir || ocr.tesseractPath),

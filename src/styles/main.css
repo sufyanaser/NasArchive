@@ -420,6 +420,17 @@ body {
   border-color: var(--border-focus);
 }
 
+.settings-path-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.settings-path-row .form-input {
+  min-width: 0;
+}
+
 .smart-suggest-wrapper {
   position: relative;
 }

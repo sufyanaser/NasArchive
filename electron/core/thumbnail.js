@@ -11,6 +11,7 @@ console.warn = (...args) => {
 };
 const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
 console.warn = _origWarn;
+const sharp = require('sharp');
 const storage = require('./storage');
 
 function escapeXml(value) {
@@ -23,6 +24,14 @@ function escapeXml(value) {
 
 class ThumbnailService {
   getThumbnailPath(documentId) {
+    const id = Number(documentId);
+    if (!Number.isInteger(id) || id <= 0) {
+      throw new Error('Invalid document id for thumbnail.');
+    }
+    return path.join(storage.dirs.thumbnails, `${String(id).padStart(7, '0')}.png`);
+  }
+
+  getLegacyThumbnailPath(documentId) {
     const id = Number(documentId);
     if (!Number.isInteger(id) || id <= 0) {
       throw new Error('Invalid document id for thumbnail.');
@@ -50,6 +59,34 @@ class ThumbnailService {
         path: thumbnailPath,
         relativePath: path.relative(storage.baseDir, thumbnailPath),
       };
+    }
+    const legacyPath = this.getLegacyThumbnailPath(id);
+    if (fs.existsSync(legacyPath) && !options.force) {
+      return {
+        success: true,
+        reused: true,
+        path: legacyPath,
+        relativePath: path.relative(storage.baseDir, legacyPath),
+      };
+    }
+
+    try {
+      await sharp(pdfPath, { page: 0, density: 144 })
+        .resize({ width: 360, height: 520, fit: 'inside', withoutEnlargement: true })
+        .png({ compressionLevel: 9, adaptiveFiltering: true })
+        .toFile(thumbnailPath);
+
+      return {
+        success: true,
+        reused: false,
+        path: thumbnailPath,
+        relativePath: path.relative(storage.baseDir, thumbnailPath),
+        renderer: 'sharp',
+      };
+    } catch (renderErr) {
+      if (options.strictRaster) {
+        throw renderErr;
+      }
     }
 
     const data = new Uint8Array(fs.readFileSync(pdfPath));
@@ -85,27 +122,33 @@ ${fallback}
 </svg>
 `;
 
-    fs.writeFileSync(thumbnailPath, svg, 'utf8');
+    fs.writeFileSync(legacyPath, svg, 'utf8');
     return {
       success: true,
       reused: false,
-      path: thumbnailPath,
-      relativePath: path.relative(storage.baseDir, thumbnailPath),
+      path: legacyPath,
+      relativePath: path.relative(storage.baseDir, legacyPath),
       pageCount: pdf.numPages,
+      renderer: 'text-svg-fallback',
     };
   }
 
   readDataUrl(documentId) {
-    const thumbnailPath = this.getThumbnailPath(documentId);
+    let thumbnailPath = this.getThumbnailPath(documentId);
+    let mimeType = 'image/png';
+    if (!fs.existsSync(thumbnailPath)) {
+      thumbnailPath = this.getLegacyThumbnailPath(documentId);
+      mimeType = 'image/svg+xml';
+    }
     if (!fs.existsSync(thumbnailPath)) {
       return { success: false, error: 'Thumbnail not found.' };
     }
-    const svg = fs.readFileSync(thumbnailPath);
+    const data = fs.readFileSync(thumbnailPath);
     return {
       success: true,
-      mimeType: 'image/svg+xml',
-      base64: svg.toString('base64'),
-      dataUrl: `data:image/svg+xml;base64,${svg.toString('base64')}`,
+      mimeType,
+      base64: data.toString('base64'),
+      dataUrl: `data:${mimeType};base64,${data.toString('base64')}`,
     };
   }
 }

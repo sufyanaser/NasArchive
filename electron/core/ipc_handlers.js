@@ -30,16 +30,27 @@ function setupNativeIpcHandlers(appDataDir) {
       const totalDocs = docService.getCount();
       const scannerRes = await scanner.listDevices('wia');
       const readiness = await scanner.checkReadiness(null, 'wia');
+      const storageOk = Boolean(storage.baseDir && fs.existsSync(storage.baseDir));
 
       return {
         success: true,
         engine: 'NAS Archive Native',
         dockerRequired: false,
         wslRequired: false,
+        nativeCore: {
+          ok: storageOk,
+          initialized: storageOk,
+          status: storageOk ? 'READY' : 'NEEDS_ATTENTION',
+          storagePath: storage.baseDir,
+          message: storageOk ? 'النواة المحلية جاهزة' : 'مجلد الأرشفة المحلي غير جاهز',
+        },
         database: {
           path: dbManager.dbPath,
           integrity: integrity.ok,
+          ok: integrity.ok,
           totalDocuments: totalDocs,
+          totalDocs,
+          error: integrity.error || null,
         },
         scanner: {
           detected: scannerRes.devices.length > 0,
@@ -54,6 +65,8 @@ function setupNativeIpcHandlers(appDataDir) {
           tesseract: Boolean(ocr.tesseractPath),
         },
         storage: {
+          ok: storageOk,
+          path: storage.baseDir,
           base: storage.baseDir,
           originals: storage.dirs.originals,
           archive: storage.dirs.archive,

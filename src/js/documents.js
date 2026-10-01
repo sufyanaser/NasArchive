@@ -1228,7 +1228,10 @@ class DocumentsController {
     if (this.dom.customFieldsContainer) {
       this.dom.customFieldsContainer.innerHTML = '';
       const docFields = doc.custom_fields || [];
-      this.customFields.forEach((cf) => {
+      const primaryFieldNames = new Set(['رقم الكتاب', 'الجهة المرسلة', 'الجهة المستلمة', 'تاريخ الورود', 'رقم القيد']);
+      const primaryFields = this.customFields.filter((cf) => primaryFieldNames.has(cf.name));
+      const secondaryFields = this.customFields.filter((cf) => !primaryFieldNames.has(cf.name));
+      const renderField = (cf, target) => {
         const existingVal = docFields.find((f) => f.field === cf.id);
         const valStr = existingVal ? existingVal.value : '';
 
@@ -1239,11 +1242,22 @@ class DocumentsController {
           <label class="field-label">${cf.name}:</label>
           <input type="text" class="form-input custom-field-input" data-field-id="${cf.id}" value="${valStr || ''}" placeholder="أدخل ${cf.name}...">
         `;
-        this.dom.customFieldsContainer.appendChild(group);
+        target.appendChild(group);
         if (fieldKey) {
           this._enhanceInputWithSuggestions(group.querySelector('.custom-field-input'), fieldKey);
         }
-      });
+      };
+
+      primaryFields.forEach((cf) => renderField(cf, this.dom.customFieldsContainer));
+
+      if (secondaryFields.length > 0) {
+        const advanced = document.createElement('details');
+        advanced.className = 'advanced-details';
+        advanced.innerHTML = '<summary>حقول إضافية للمزامنة والمراجعة</summary><div class="secondary-fields-wrap"></div>';
+        const wrap = advanced.querySelector('.secondary-fields-wrap');
+        secondaryFields.forEach((cf) => renderField(cf, wrap));
+        this.dom.customFieldsContainer.appendChild(advanced);
+      }
     }
 
     // OCR Content

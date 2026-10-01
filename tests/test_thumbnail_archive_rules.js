@@ -63,8 +63,12 @@ async function run() {
 
   const thumb = await thumbnail.generateForPdf(doc.id, archived.path, { title: doc.title });
   assert.strictEqual(thumb.success, true);
-  assert.ok(fs.existsSync(thumb.path), 'Thumbnail SVG must be stored.');
-  assert.ok(thumb.relativePath.endsWith(`${String(doc.id).padStart(7, '0')}.svg`), 'Thumbnail filename must be deterministic by document id.');
+  assert.ok(fs.existsSync(thumb.path), 'Thumbnail must be stored.');
+  assert.ok(
+    thumb.relativePath.endsWith(`${String(doc.id).padStart(7, '0')}.png`) ||
+    thumb.relativePath.endsWith(`${String(doc.id).padStart(7, '0')}.svg`),
+    'Thumbnail filename must be deterministic by document id.'
+  );
 
   const updated = docService.setThumbnailPath(doc.id, thumb.relativePath);
   assert.strictEqual(updated.thumbnail_path, thumb.relativePath);
@@ -74,7 +78,10 @@ async function run() {
 
   const dataUrl = thumbnail.readDataUrl(doc.id);
   assert.strictEqual(dataUrl.success, true);
-  assert.ok(dataUrl.dataUrl.startsWith('data:image/svg+xml;base64,'));
+  assert.ok(
+    dataUrl.dataUrl.startsWith('data:image/png;base64,') ||
+    dataUrl.dataUrl.startsWith('data:image/svg+xml;base64,')
+  );
 
   const corruptPath = path.join(storage.dirs.staging, 'corrupt.pdf');
   fs.writeFileSync(corruptPath, Buffer.from('NOT_A_PDF'));

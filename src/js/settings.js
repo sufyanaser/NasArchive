@@ -11,6 +11,15 @@ class SettingsController {
       defaultDpiSelect: document.getElementById('settingDefaultDpi'),
       defaultSourceSelect: document.getElementById('settingDefaultSource'),
       autoDeskewCheckbox: document.getElementById('settingAutoDeskew'),
+      archivePathInput: document.getElementById('settingArchivePath'),
+      archivePathStatus: document.getElementById('archivePathStatus'),
+      archivePathHelp: document.getElementById('archivePathHelp'),
+      btnChooseArchivePath: document.getElementById('btnChooseArchivePath'),
+      btnValidateArchivePath: document.getElementById('btnValidateArchivePath'),
+      googleDriveEnabled: document.getElementById('settingGoogleDriveEnabled'),
+      googleDriveFolderId: document.getElementById('settingGoogleDriveFolderId'),
+      googleDriveStatus: document.getElementById('googleDriveStatus'),
+      googleDriveHelp: document.getElementById('googleDriveHelp'),
 
       statusRuntime: document.getElementById('statusRuntime'),
       statusNativeCore: document.getElementById('statusNativeCore'),
@@ -68,6 +77,24 @@ class SettingsController {
     if (this.dom.autoDeskewCheckbox) {
       this.dom.autoDeskewCheckbox.addEventListener('change', (e) => savePref('autoDeskew', e.target.checked));
     }
+    if (this.dom.btnChooseArchivePath) {
+      this.dom.btnChooseArchivePath.addEventListener('click', () => this.chooseArchivePath());
+    }
+    if (this.dom.btnValidateArchivePath) {
+      this.dom.btnValidateArchivePath.addEventListener('click', () => this.validateArchivePath());
+    }
+    if (this.dom.googleDriveEnabled) {
+      this.dom.googleDriveEnabled.addEventListener('change', (e) => {
+        savePref('googleDriveSyncEnabled', e.target.checked);
+        this.renderGoogleDriveStatus();
+      });
+    }
+    if (this.dom.googleDriveFolderId) {
+      this.dom.googleDriveFolderId.addEventListener('change', (e) => {
+        savePref('googleDriveFolderId', e.target.value.trim());
+        this.renderGoogleDriveStatus();
+      });
+    }
 
     // Refresh Services
     if (this.dom.btnRefreshServices) {
@@ -112,6 +139,17 @@ class SettingsController {
     if (prefs.autoDeskew !== undefined && this.dom.autoDeskewCheckbox) {
       this.dom.autoDeskewCheckbox.checked = prefs.autoDeskew;
     }
+    if (this.dom.archivePathInput) {
+      this.dom.archivePathInput.value = prefs.archiveStoragePath || '';
+      await this.validateArchivePath(false);
+    }
+    if (this.dom.googleDriveEnabled) {
+      this.dom.googleDriveEnabled.checked = Boolean(prefs.googleDriveSyncEnabled);
+    }
+    if (this.dom.googleDriveFolderId) {
+      this.dom.googleDriveFolderId.value = prefs.googleDriveFolderId || '';
+    }
+    this.renderGoogleDriveStatus();
   }
 
   async refreshServiceStatus() {
@@ -128,15 +166,15 @@ class SettingsController {
         };
       }
 
-      const nativeOk = Boolean(
-        health.nativeCore &&
-        (health.nativeCore.ok === undefined || health.nativeCore.ok)
-      );
+      const nativeOk = Boolean(health.nativeCore && health.nativeCore.ok);
       const dbOk = Boolean(health.database && health.database.ok);
+      if (this.dom.archivePathInput && health.storage && health.storage.path) {
+        this.dom.archivePathInput.value = health.storage.path;
+      }
 
       this._updatePill(this.dom.statusRuntime, true, 'تطبيق Windows محلي');
-      this._updatePill(this.dom.statusNativeCore, nativeOk, nativeOk ? 'النواة المحلية جاهزة' : 'النواة المحلية غير جاهزة');
-      this._updatePill(this.dom.statusDatabase, dbOk, dbOk ? 'SQLite FTS5 سليمة' : 'قاعدة البيانات تحتاج فحصاً');
+      this._updatePill(this.dom.statusNativeCore, nativeOk, nativeOk ? 'النواة المحلية جاهزة' : (health.nativeCore && health.nativeCore.message) || 'النواة المحلية تحتاج فحصاً');
+      this._updatePill(this.dom.statusDatabase, dbOk, dbOk ? `SQLite سليمة (${health.database.totalDocs || 0} وثيقة)` : (health.database && health.database.error) || 'قاعدة البيانات تحتاج فحصاً');
 
       const devs = (health.scanner && health.scanner.detected_devices) || [];
       const devName = devs.length > 0 ? devs[0] : 'لا يوجد جهاز متصل';
@@ -151,6 +189,56 @@ class SettingsController {
     el.className = `status-pill ${isOk ? 'online' : 'offline'}`;
     const span = el.querySelector('span:last-child');
     if (span) span.textContent = text;
+  }
+
+  async chooseArchivePath() {
+    if (!window.nasArchive || !window.nasArchive.storage) return;
+    const res = await window.nasArchive.storage.selectArchiveFolder();
+    if (!res) return;
+    if (res.ok) {
+      if (this.dom.archivePathInput) this.dom.archivePathInput.value = res.path;
+      if (window.nasArchive.preferences) {
+        await window.nasArchive.preferences.set('archiveStoragePath', res.path);
+      }
+      this.renderArchivePathStatus(true, 'المسار صالح', 'تم حفظ المجلد. أعد تشغيل التطبيق لتطبيق المسار على قاعدة البيانات والأرشيف.');
+    } else {
+      this.renderArchivePathStatus(false, 'المسار غير صالح', res.error || 'تعذر استخدام هذا المجلد.');
+    }
+  }
+
+  async validateArchivePath(showSuccessMessage = true) {
+    if (!this.dom.archivePathInput || !window.nasArchive || !window.nasArchive.storage) return;
+    const targetPath = this.dom.archivePathInput.value.trim();
+    if (!targetPath) {
+      this.renderArchivePathStatus(false, 'غير محدد', 'اختر مجلد الأرشفة المحلي قبل الاعتماد على التطبيق للإنتاج.');
+      return;
+    }
+    const res = await window.nasArchive.storage.validatePath(targetPath);
+    if (res.ok) {
+      this.renderArchivePathStatus(true, 'المسار صالح', showSuccessMessage ? 'تم فحص المجلد بنجاح: القراءة والكتابة متاحتان.' : 'المجلد الحالي صالح للقراءة والكتابة.');
+    } else {
+      this.renderArchivePathStatus(false, 'المسار غير صالح', res.error || 'تعذر القراءة أو الكتابة في هذا المجلد.');
+    }
+  }
+
+  renderArchivePathStatus(ok, label, help) {
+    this._updatePill(this.dom.archivePathStatus, ok, label);
+    if (this.dom.archivePathHelp) {
+      this.dom.archivePathHelp.textContent = help;
+      this.dom.archivePathHelp.style.color = ok ? 'var(--text-secondary)' : '#ef4444';
+    }
+  }
+
+  renderGoogleDriveStatus() {
+    const enabled = Boolean(this.dom.googleDriveEnabled && this.dom.googleDriveEnabled.checked);
+    const folderId = this.dom.googleDriveFolderId ? this.dom.googleDriveFolderId.value.trim() : '';
+    const ready = enabled && folderId.length > 0;
+    this._updatePill(this.dom.googleDriveStatus, ready, ready ? 'جاهز للتحقق' : enabled ? 'ينقص معرف المجلد' : 'غير مفعل');
+    if (this.dom.googleDriveHelp) {
+      this.dom.googleDriveHelp.textContent = ready
+        ? 'تم حفظ إعداد المجلد. ستبقى كل مزامنة مشروطة باعتماد الوثيقة ووجود اعتماد Google في بيئة التشغيل.'
+        : 'المزامنة لا ترفع أي ملف الآن. فعّلها وأدخل معرف مجلد Google Drive بعد تجهيز الاعتمادات.';
+    }
   }
 
   async refreshUpdateStatus() {
