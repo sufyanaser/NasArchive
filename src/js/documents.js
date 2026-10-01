@@ -36,6 +36,13 @@ class DocumentsController {
     this.activeDocument = null;
     this.originalEditState = null;
     this.modalPdfViewer = null;
+    this.suggestionState = {
+      activeInput: null,
+      menu: null,
+      items: [],
+      selectedIndex: -1,
+      requestSeq: 0,
+    };
 
     this.dom = {};
   }
@@ -256,6 +263,166 @@ class DocumentsController {
     document.addEventListener('click', () => {
       document.querySelectorAll('.filter-dropdown-menu').forEach((m) => m.classList.remove('show'));
     });
+  }
+
+  _suggestionFieldKey(fieldName) {
+    const map = {
+      'الجهة المرسلة': 'sender',
+      'الجهة المستلمة': 'recipient',
+      'الكتاب المرجعي': 'reference_document',
+      'معتمد للمزامنة': 'sync_approved',
+      'راجعه': 'reviewed_by',
+      'رقم القيد': 'entry_number',
+      'ملاحظات': 'notes',
+    };
+    return map[fieldName] || null;
+  }
+
+  _getSelectedDepartmentFromEditor() {
+    const selectedPill = this.dom.deptTagsContainer ? this.dom.deptTagsContainer.querySelector('.filter-pill.active') : null;
+    return selectedPill ? selectedPill.textContent.trim() : null;
+  }
+
+  _enhanceInputWithSuggestions(input, fieldKey) {
+    if (!input || !fieldKey) return;
+    const wrapper = document.createElement('div');
+    wrapper.className = 'smart-suggest-wrapper';
+    input.parentNode.insertBefore(wrapper, input);
+    wrapper.appendChild(input);
+
+    const menu = document.createElement('div');
+    menu.className = 'smart-suggest-menu';
+    menu.setAttribute('role', 'listbox');
+    menu.dir = 'rtl';
+    wrapper.appendChild(menu);
+
+    let debounce = null;
+    const refresh = () => {
+      clearTimeout(debounce);
+      debounce = setTimeout(() => this._loadFieldSuggestions(input, menu, fieldKey), 120);
+    };
+
+    input.setAttribute('autocomplete', 'off');
+    input.addEventListener('focus', refresh);
+    input.addEventListener('input', refresh);
+    input.addEventListener('keydown', (event) => this._handleSuggestionKeydown(event, input, menu));
+    input.addEventListener('blur', () => {
+      setTimeout(() => {
+        if (this.suggestionState.activeInput === input) this._closeSuggestionMenu();
+      }, 140);
+    });
+  }
+
+  async _loadFieldSuggestions(input, menu, fieldKey) {
+    if (!input || !menu || !window.api || !window.api.getSuggestions) return;
+    const requestSeq = ++this.suggestionState.requestSeq;
+    const query = input.value || '';
+    const context = {
+      department: this._getSelectedDepartmentFromEditor(),
+      documentId: this.activeDocument ? this.activeDocument.id : null,
+      limit: 8,
+    };
+
+    try {
+      const res = await window.api.getSuggestions(fieldKey, query, context);
+      if (requestSeq !== this.suggestionState.requestSeq) return;
+      const suggestions = res && res.success && Array.isArray(res.suggestions) ? res.suggestions : [];
+      this._renderSuggestionMenu(input, menu, suggestions);
+    } catch (e) {
+      this._closeSuggestionMenu();
+    }
+  }
+
+  _renderSuggestionMenu(input, menu, suggestions) {
+    const typed = (input.value || '').trim();
+    const unique = [];
+    const seen = new Set();
+    suggestions.forEach((item) => {
+      const value = String(item.value || '').trim();
+      const key = value.toLowerCase();
+      if (!value || seen.has(key)) return;
+      seen.add(key);
+      unique.push(value);
+    });
+
+    const showUseTyped = typed && !seen.has(typed.toLowerCase());
+    if (unique.length === 0 && !showUseTyped) {
+      this._closeSuggestionMenu();
+      return;
+    }
+
+    const entries = [
+      ...unique.map((value) => ({ value, label: value, typed: false })),
+      ...(showUseTyped ? [{ value: typed, label: `استخدام القيمة المدخلة: ${typed}`, typed: true }] : []),
+    ];
+
+    menu.innerHTML = '';
+    entries.forEach((entry, index) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `smart-suggest-item${entry.typed ? ' typed-value' : ''}`;
+      button.textContent = entry.label;
+      button.setAttribute('role', 'option');
+      button.addEventListener('mousedown', (event) => {
+        event.preventDefault();
+        this._selectSuggestion(input, entry.value);
+      });
+      menu.appendChild(button);
+      if (index === 0) button.classList.add('active');
+    });
+
+    this.suggestionState.activeInput = input;
+    this.suggestionState.menu = menu;
+    this.suggestionState.items = entries;
+    this.suggestionState.selectedIndex = 0;
+    menu.classList.add('open');
+  }
+
+  _handleSuggestionKeydown(event, input, menu) {
+    if (!menu || !menu.classList.contains('open')) return;
+    const itemCount = this.suggestionState.items.length;
+    if (itemCount === 0) return;
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      this._setSuggestionIndex((this.suggestionState.selectedIndex + 1) % itemCount);
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      this._setSuggestionIndex((this.suggestionState.selectedIndex - 1 + itemCount) % itemCount);
+    } else if (event.key === 'Enter') {
+      event.preventDefault();
+      const selected = this.suggestionState.items[this.suggestionState.selectedIndex];
+      if (selected) this._selectSuggestion(input, selected.value);
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      this._closeSuggestionMenu();
+    }
+  }
+
+  _setSuggestionIndex(index) {
+    const menu = this.suggestionState.menu;
+    if (!menu) return;
+    this.suggestionState.selectedIndex = index;
+    Array.from(menu.querySelectorAll('.smart-suggest-item')).forEach((item, itemIndex) => {
+      item.classList.toggle('active', itemIndex === index);
+    });
+  }
+
+  _selectSuggestion(input, value) {
+    input.value = value;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    this._closeSuggestionMenu();
+  }
+
+  _closeSuggestionMenu() {
+    if (this.suggestionState.menu) {
+      this.suggestionState.menu.classList.remove('open');
+      this.suggestionState.menu.innerHTML = '';
+    }
+    this.suggestionState.activeInput = null;
+    this.suggestionState.menu = null;
+    this.suggestionState.items = [];
+    this.suggestionState.selectedIndex = -1;
   }
 
   async loadMetadata() {
@@ -1067,11 +1234,15 @@ class DocumentsController {
 
         const group = document.createElement('div');
         group.className = 'form-group';
+        const fieldKey = this._suggestionFieldKey(cf.name);
         group.innerHTML = `
           <label class="field-label">${cf.name}:</label>
           <input type="text" class="form-input custom-field-input" data-field-id="${cf.id}" value="${valStr || ''}" placeholder="أدخل ${cf.name}...">
         `;
         this.dom.customFieldsContainer.appendChild(group);
+        if (fieldKey) {
+          this._enhanceInputWithSuggestions(group.querySelector('.custom-field-input'), fieldKey);
+        }
       });
     }
 
@@ -1128,6 +1299,7 @@ class DocumentsController {
   }
 
   closeModal() {
+    this._closeSuggestionMenu();
     this.dom.modal.classList.remove('open');
     this.activeDocument = null;
     this.originalEditState = null;

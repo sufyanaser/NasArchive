@@ -420,6 +420,58 @@ body {
   border-color: var(--border-focus);
 }
 
+.smart-suggest-wrapper {
+  position: relative;
+}
+
+.smart-suggest-wrapper .form-input {
+  width: 100%;
+}
+
+.smart-suggest-menu {
+  position: absolute;
+  inset-inline: 0;
+  top: calc(100% + 4px);
+  z-index: 1200;
+  display: none;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: 4px;
+  direction: rtl;
+}
+
+.smart-suggest-menu.open {
+  display: block;
+}
+
+.smart-suggest-item {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  text-align: right;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  direction: rtl;
+}
+
+.smart-suggest-item:hover,
+.smart-suggest-item.active {
+  background: var(--bg-surface-elevated);
+  color: var(--accent-primary);
+}
+
+.smart-suggest-item.typed-value {
+  color: var(--text-secondary);
+}
+
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;

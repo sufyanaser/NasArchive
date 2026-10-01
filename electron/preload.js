@@ -136,6 +136,10 @@ contextBridge.exposeInMainWorld('nasArchive', {
     clear: () => ipcRenderer.invoke('logs:clear'),
   },
 
+  suggestions: {
+    get: (field, query, context = {}) => ipcRenderer.invoke('suggestions:get', { field, query, context }),
+  },
+
   // Local Users
   users: {
     list: () => ipcRenderer.invoke('users:list'),

@@ -20,6 +20,7 @@ const archiveService = require('./archive_service');
 const thumbnailService = require('./thumbnail');
 const archiveRules = require('./archive_rules');
 const enhancementService = require('./enhancement');
+const smartSuggestions = require('./smart_suggestions');
 
 function setupNativeIpcHandlers(appDataDir) {
   // 1. System & Engine Health Status
@@ -349,6 +350,14 @@ function setupNativeIpcHandlers(appDataDir) {
       return { isDuplicate: Boolean(dup), existing: dup };
     } catch (err) {
       return { isDuplicate: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('suggestions:get', async (event, { field, query = '', context = {} } = {}) => {
+    try {
+      return smartSuggestions.getSuggestions(field, query, context);
+    } catch (err) {
+      return { success: false, error: err.message, suggestions: [] };
     }
   });
 
