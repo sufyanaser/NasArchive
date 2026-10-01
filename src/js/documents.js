@@ -94,6 +94,7 @@ class DocumentsController {
       sortSelect: document.getElementById('docsSortSelect'),
       savedViewsSelect: document.getElementById('savedViewsSelect'),
       btnSaveCurrentView: document.getElementById('btnSaveCurrentView'),
+      scopeTabs: document.querySelectorAll('.archive-scope-tabs .scope-tab'),
 
       // Bulk Action Bar
       bulkBar: document.getElementById('bulkActionsBar'),
@@ -121,6 +122,11 @@ class DocumentsController {
       selectStoragePath: document.getElementById('editDocStoragePath'),
       deptTagsContainer: document.getElementById('editDocDeptTags'),
       customFieldsContainer: document.getElementById('editDocCustomFields'),
+      docDateSlot: document.getElementById('editDocDateSlot'),
+      docNumberSlot: document.getElementById('editDocNumberSlot'),
+      correspondenceFields: document.getElementById('editCorrespondenceFields'),
+      reviewFields: document.getElementById('editReviewFields'),
+      technicalFields: document.getElementById('editTechnicalFields'),
       ocrContentBox: document.getElementById('modalOcrContent'),
     };
   }
@@ -212,6 +218,7 @@ class DocumentsController {
     if (this.dom.modalApproveBtn) this.dom.modalApproveBtn.addEventListener('click', () => this.approveDocument());
     if (this.dom.modalDownloadBtn) this.dom.modalDownloadBtn.addEventListener('click', () => this.downloadActiveDocument());
     if (this.dom.modalDeleteBtn) this.dom.modalDeleteBtn.addEventListener('click', () => this.deleteActiveDocument());
+    this._setupEditorTabs();
 
     // 8. Modal Viewer Toolbar
     const prev = document.getElementById('modalBtnPrev');
@@ -238,6 +245,30 @@ class DocumentsController {
         if (e.target.value) this.applySavedView(parseInt(e.target.value, 10));
       });
     }
+    if (this.dom.scopeTabs) {
+      this.dom.scopeTabs.forEach((tab) => {
+        tab.addEventListener('click', () => this.setArchiveScope(tab.dataset.scope || 'all'));
+      });
+    }
+  }
+
+  setArchiveScope(scope) {
+    if (scope === 'trash') {
+      if (window.appRouter) window.appRouter.navigate('trash');
+      return;
+    }
+    const normalized = ['all', 'pending', 'approved'].includes(scope) ? scope : 'all';
+    this.selectedApprovalStatus = normalized === 'all' ? 'all' : normalized;
+    this.currentPage = 1;
+    if (this.dom.scopeTabs) {
+      this.dom.scopeTabs.forEach((tab) => {
+        const active = tab.dataset.scope === normalized;
+        tab.classList.toggle('active', active);
+        tab.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+    }
+    this.fetchDocuments();
+    this._renderFilterChips();
   }
 
   _setupDropdowns() {
@@ -262,6 +293,24 @@ class DocumentsController {
 
     document.addEventListener('click', () => {
       document.querySelectorAll('.filter-dropdown-menu').forEach((m) => m.classList.remove('show'));
+    });
+  }
+
+  _setupEditorTabs() {
+    const tabs = document.querySelectorAll('.editor-tab');
+    const panels = document.querySelectorAll('.editor-panel');
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        const target = tab.dataset.editorTab;
+        tabs.forEach((item) => {
+          const active = item === tab;
+          item.classList.toggle('active', active);
+          item.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
+        panels.forEach((panel) => {
+          panel.classList.toggle('active', panel.dataset.editorPanel === target);
+        });
+      });
     });
   }
 
@@ -1268,12 +1317,12 @@ class DocumentsController {
 
     // Custom Fields
     if (this.dom.customFieldsContainer) {
-      this.dom.customFieldsContainer.innerHTML = '';
+      [this.dom.docDateSlot, this.dom.docNumberSlot, this.dom.correspondenceFields, this.dom.reviewFields, this.dom.technicalFields]
+        .filter(Boolean)
+        .forEach((el) => { el.innerHTML = ''; });
       const docFields = doc.custom_fields || [];
-      const primaryFieldNames = new Set(['رقم الكتاب', 'الجهة المرسلة', 'الجهة المستلمة', 'تاريخ الورود', 'رقم القيد']);
-      const primaryFields = this.customFields.filter((cf) => primaryFieldNames.has(cf.name));
-      const secondaryFields = this.customFields.filter((cf) => !primaryFieldNames.has(cf.name));
       const renderField = (cf, target) => {
+        if (!target) return;
         const existingVal = docFields.find((f) => f.field === cf.id);
         const valStr = existingVal ? existingVal.value : '';
 
@@ -1290,15 +1339,42 @@ class DocumentsController {
         }
       };
 
-      primaryFields.forEach((cf) => renderField(cf, this.dom.customFieldsContainer));
+      const fieldTargets = {
+        'رقم الكتاب': this.dom.docNumberSlot,
+        'تاريخ الورود': this.dom.docDateSlot,
+        'الجهة المرسلة': this.dom.correspondenceFields,
+        'الجهة المستلمة': this.dom.correspondenceFields,
+        'الكتاب المرجعي': this.dom.correspondenceFields,
+        'رقم القيد': this.dom.correspondenceFields,
+        'راجعه': this.dom.reviewFields,
+        'معتمد للمزامنة': this.dom.reviewFields,
+        'ملاحظات': this.dom.reviewFields,
+      };
 
-      if (secondaryFields.length > 0) {
-        const advanced = document.createElement('details');
-        advanced.className = 'advanced-details';
-        advanced.innerHTML = '<summary>حقول إضافية للمزامنة والمراجعة</summary><div class="secondary-fields-wrap"></div>';
-        const wrap = advanced.querySelector('.secondary-fields-wrap');
-        secondaryFields.forEach((cf) => renderField(cf, wrap));
-        this.dom.customFieldsContainer.appendChild(advanced);
+      this.customFields.forEach((cf) => {
+        renderField(cf, fieldTargets[cf.name] || this.dom.technicalFields);
+      });
+
+      if (this.dom.technicalFields) {
+        const tech = [
+          ['معرّف الوثيقة', doc.id],
+          ['اسم الملف الأصلي', doc.original_filename || '—'],
+          ['المسار المؤرشف', doc.archive_filename || '—'],
+          ['البصمة', doc.archive_checksum || doc.original_checksum || '—'],
+          ['حالة التحسين', doc.enhancement_status || '—'],
+          ['المصغّر', doc.thumbnail_path || 'غير متاح'],
+          ['تاريخ الإنشاء', doc.created_at || '—'],
+          ['آخر تعديل', doc.modified_at || '—'],
+        ];
+        const list = document.createElement('div');
+        list.className = 'technical-list';
+        list.innerHTML = tech.map(([label, value]) => `
+          <div class="technical-row">
+            <span>${label}</span>
+            <strong class="ltr">${value}</strong>
+          </div>
+        `).join('');
+        this.dom.technicalFields.appendChild(list);
       }
     }
 

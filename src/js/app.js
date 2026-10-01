@@ -7,6 +7,7 @@
 class AppRouter {
   constructor() {
     this.currentRoute = 'scanner';
+    this.currentDocScope = 'all';
     this.navItems = document.querySelectorAll('.sidebar .nav-item');
     this.viewPanes = document.querySelectorAll('.workspace .view-pane');
 
@@ -16,11 +17,27 @@ class AppRouter {
     this.dashboardController = null;
     this.settingsController = null;
     this.archiveExtended = null;
+    this.routeMeta = {
+      dashboard: ['مساحة العمل', 'الرئيسية'],
+      scanner: ['مساحة العمل', 'المسح والاستيراد'],
+      import: ['مساحة العمل', 'استيراد ملف'],
+      documents: ['مساحة العمل', 'الأرشيف'],
+      attributes: ['إدارة البيانات', 'الجهات والأنواع والوسوم'],
+      savedViews: ['الأرشيف', 'طرق العرض المحفوظة'],
+      workflows: ['إدارة البيانات', 'سير العمل'],
+      trash: ['الأرشيف', 'سلة المهملات'],
+      tasks: ['النظام', 'السجلات والمهام'],
+      logs: ['النظام', 'النسخ الاحتياطي والسجلات'],
+      users: ['النظام', 'المستخدمون'],
+      settings: ['النظام', 'الإعدادات والتحديثات'],
+    };
   }
 
   async init() {
     this._setupWindowControls();
     this._setupNavigation();
+    this._setupTopbar();
+    this._setupKeyboardShortcuts();
     this._setupSplitPaneResizer();
     this._setupLiveHealthPolling();
 
@@ -77,17 +94,27 @@ class AppRouter {
       item.addEventListener('click', (e) => {
         e.preventDefault();
         const targetView = item.dataset.view;
-        if (targetView) this.navigate(targetView);
+        if (targetView) {
+          this.navigate(targetView, {
+            docScope: item.dataset.docScope || null,
+          });
+        }
       });
     });
   }
 
-  navigate(route) {
+  navigate(route, options = {}) {
     this.currentRoute = route;
+    if (route === 'documents') {
+      this.currentDocScope = options.docScope || this.currentDocScope || 'all';
+    }
 
     // Update sidebar active class
     this.navItems.forEach((item) => {
-      if (item.dataset.view === route) {
+      const sameRoute = item.dataset.view === route;
+      const itemScope = item.dataset.docScope || null;
+      const sameScope = route !== 'documents' || !itemScope || itemScope === this.currentDocScope;
+      if (sameRoute && sameScope) {
         item.classList.add('active');
       } else {
         item.classList.remove('active');
@@ -105,6 +132,9 @@ class AppRouter {
 
     // Hook lifecycle on view activation
     if (route === 'documents' && this.documentsController) {
+      if (options.docScope) {
+          this.documentsController.setArchiveScope(this.currentDocScope);
+      }
       this.documentsController.fetchDocuments();
     } else if (route === 'dashboard' && this.dashboardController) {
       this.dashboardController.refresh();
@@ -125,6 +155,66 @@ class AppRouter {
     } else if (route === 'users' && this.archiveExtended) {
       this.archiveExtended.renderUsers();
     }
+
+    this._updateTopbar(route);
+  }
+
+  _setupTopbar() {
+    const scanBtn = document.getElementById('topbarScanBtn');
+    const importBtn = document.getElementById('topbarImportBtn');
+    const globalSearch = document.getElementById('globalSearchInput');
+
+    if (scanBtn) scanBtn.addEventListener('click', () => this.navigate('scanner'));
+    if (importBtn) importBtn.addEventListener('click', () => this.navigate('import'));
+    if (globalSearch) {
+      globalSearch.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          this.navigate('documents');
+          if (this.documentsController && this.documentsController.dom.searchInput) {
+            this.documentsController.dom.searchInput.value = globalSearch.value;
+            this.documentsController.searchQuery = globalSearch.value.trim();
+            this.documentsController.fetchDocuments();
+          }
+        }
+      });
+    }
+  }
+
+  _updateTopbar(route) {
+    const breadcrumb = document.getElementById('topbarBreadcrumb');
+    const title = document.getElementById('topbarTitle');
+    const meta = this.routeMeta[route] || ['NAS Archive', route];
+    if (breadcrumb) breadcrumb.textContent = meta[0];
+    if (title) title.textContent = meta[1];
+  }
+
+  _setupKeyboardShortcuts() {
+    document.addEventListener('keydown', (event) => {
+      const activeTag = (document.activeElement && document.activeElement.tagName || '').toLowerCase();
+      const isTyping = ['input', 'textarea', 'select'].includes(activeTag);
+
+      if (event.ctrlKey && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        const search = this.currentRoute === 'documents'
+          ? document.getElementById('docsSearchInput')
+          : document.getElementById('globalSearchInput');
+        if (search) search.focus();
+      } else if (event.ctrlKey && event.key.toLowerCase() === 'n') {
+        event.preventDefault();
+        this.navigate('import');
+      } else if (event.key === 'Escape') {
+        const modal = document.getElementById('docDetailModal');
+        if (modal && modal.classList.contains('open') && this.documentsController) {
+          this.documentsController.closeModal();
+        }
+      } else if (!isTyping && event.key === 'Delete' && this.currentRoute === 'documents' && this.documentsController) {
+        event.preventDefault();
+        this.documentsController.executeBulkDelete();
+      } else if (!isTyping && event.key === 'Enter' && this.currentRoute === 'documents' && this.documentsController) {
+        const first = this.documentsController.documents && this.documentsController.documents[0];
+        if (first) this.documentsController.openDocumentModal(first);
+      }
+    });
   }
 
   _setupSplitPaneResizer() {
