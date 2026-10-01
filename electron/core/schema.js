@@ -297,6 +297,27 @@ const MIGRATIONS = [
       db.exec('DROP TABLE IF EXISTS storage_paths;');
     },
   },
+  {
+    version: 3,
+    description: 'Add enhanced document derivative metadata',
+    up: (db) => {
+      const columns = [
+        ['enhanced_file_path', 'TEXT'],
+        ['enhanced_checksum', 'TEXT'],
+        ['enhanced_size', 'INTEGER'],
+        ['enhancement_status', "TEXT DEFAULT 'PENDING'"],
+        ['enhancement_error', 'TEXT'],
+      ];
+
+      for (const [name, definition] of columns) {
+        try {
+          db.exec(`ALTER TABLE documents ADD COLUMN ${name} ${definition};`);
+        } catch (e) {
+          // column may already exist
+        }
+      }
+    },
+  },
 ];
 
 module.exports = {

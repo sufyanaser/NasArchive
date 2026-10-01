@@ -55,6 +55,7 @@ contextBridge.exposeInMainWorld('nasArchive', {
     bulkSetType: (ids, typeId) => ipcRenderer.invoke('documents:bulk-set-type', { ids, typeId }),
     bulkSetCorrespondent: (ids, correspondentId) => ipcRenderer.invoke('documents:bulk-set-correspondent', { ids, correspondentId }),
     readBinary: (id) => ipcRenderer.invoke('documents:read-binary', id),
+    getThumbnail: (id) => ipcRenderer.invoke('documents:thumbnail', id),
     exportFile: (id) => ipcRenderer.invoke('documents:export-file', id),
     getTags: () => ipcRenderer.invoke('documents:get-tags'),
     getDocumentTypes: () => ipcRenderer.invoke('documents:get-types'),
@@ -133,6 +134,10 @@ contextBridge.exposeInMainWorld('nasArchive', {
   logs: {
     list: (filter) => ipcRenderer.invoke('logs:list', filter),
     clear: () => ipcRenderer.invoke('logs:clear'),
+  },
+
+  suggestions: {
+    get: (field, query, context = {}) => ipcRenderer.invoke('suggestions:get', { field, query, context }),
   },
 
   // Local Users

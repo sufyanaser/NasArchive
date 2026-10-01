@@ -250,6 +250,20 @@ class ApiClient {
     return await res.json();
   }
 
+  async getDocumentThumbnail(id) {
+    if (window.nasArchive && window.nasArchive.documents && window.nasArchive.documents.getThumbnail) {
+      return await window.nasArchive.documents.getThumbnail(id);
+    }
+    return { success: false, error: 'Thumbnail API unavailable' };
+  }
+
+  async getSuggestions(field, query = '', context = {}) {
+    if (window.nasArchive && window.nasArchive.suggestions) {
+      return await window.nasArchive.suggestions.get(field, query, context);
+    }
+    return { success: false, suggestions: [] };
+  }
+
   async updateDocument(id, patchData) {
     if (window.nasArchive && window.nasArchive.documents) {
       const res = await window.nasArchive.documents.update(id, patchData);

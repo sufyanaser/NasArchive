@@ -296,7 +296,7 @@ class ScannerController {
     const payload = {
       filename: this.stagedDoc.filename,
       section: this.selectedDepartment,
-      allow_duplicate: this.dom.duplicateCheckbox.checked,
+      allowDuplicate: this.dom.duplicateCheckbox.checked,
     };
 
     this.dom.rescanBtn.disabled = true;

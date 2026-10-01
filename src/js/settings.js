@@ -18,6 +18,12 @@ class SettingsController {
       statusScanner: document.getElementById('statusScanner'),
       btnRefreshServices: document.getElementById('btnRefreshServices'),
 
+      updaterStatusText: document.getElementById('updaterStatusText'),
+      updaterProgressWrap: document.getElementById('updaterProgressWrap'),
+      updaterProgressBar: document.getElementById('updaterProgressBar'),
+      btnCheckUpdates: document.getElementById('btnCheckUpdates'),
+      btnInstallUpdate: document.getElementById('btnInstallUpdate'),
+
       btnCreateBackup: document.getElementById('btnCreateBackup'),
       backupStatusMsg: document.getElementById('backupStatusMsg'),
       backupsList: document.getElementById('backupsList'),
@@ -28,6 +34,7 @@ class SettingsController {
     this._bindEvents();
     await this.loadPreferences();
     await this.refreshServiceStatus();
+    await this.refreshUpdateStatus();
   }
 
   _bindEvents() {
@@ -65,6 +72,16 @@ class SettingsController {
     // Refresh Services
     if (this.dom.btnRefreshServices) {
       this.dom.btnRefreshServices.addEventListener('click', () => this.refreshServiceStatus());
+    }
+
+    if (this.dom.btnCheckUpdates) {
+      this.dom.btnCheckUpdates.addEventListener('click', () => this.checkForUpdates());
+    }
+    if (this.dom.btnInstallUpdate) {
+      this.dom.btnInstallUpdate.addEventListener('click', () => this.installDownloadedUpdate());
+    }
+    if (window.nasArchive && window.nasArchive.updater) {
+      window.nasArchive.updater.onStatus((status) => this.renderUpdateStatus(status));
     }
 
     // Backup Button
@@ -128,6 +145,67 @@ class SettingsController {
     el.className = `status-pill ${isOk ? 'online' : 'offline'}`;
     const span = el.querySelector('span:last-child');
     if (span) span.textContent = text;
+  }
+
+  async refreshUpdateStatus() {
+    if (!window.nasArchive || !window.nasArchive.updater) return;
+    try {
+      const status = await window.nasArchive.updater.getStatus();
+      this.renderUpdateStatus(status);
+    } catch (e) {
+      this.renderUpdateStatus({ state: 'error', error: e.message });
+    }
+  }
+
+  renderUpdateStatus(status = {}) {
+    if (!this.dom.updaterStatusText) return;
+    const state = status.state || 'idle';
+    const version = status.version ? ` ${status.version}` : '';
+    const messages = {
+      idle: 'جاهز للتحقق من التحديثات.',
+      development: 'التحديث التلقائي يعمل في النسخة المثبتة فقط.',
+      checking: 'جارٍ التحقق من وجود تحديث...',
+      'up-to-date': `لا توجد تحديثات جديدة. الإصدار الحالي${version}.`,
+      available: `يوجد تحديث جديد${version}. جارٍ التنزيل تلقائياً...`,
+      downloading: `جارٍ تنزيل التحديث${version}...`,
+      downloaded: `اكتمل تنزيل التحديث${version}. سيتم تثبيته عند إعادة تشغيل التطبيق.`,
+      error: `فشل التحديث: ${status.error || 'خطأ غير معروف'}`,
+    };
+    this.dom.updaterStatusText.textContent = messages[state] || messages.idle;
+
+    const isDownloading = state === 'downloading';
+    if (this.dom.updaterProgressWrap) {
+      this.dom.updaterProgressWrap.style.display = isDownloading ? 'block' : 'none';
+    }
+    if (this.dom.updaterProgressBar) {
+      const pct = Math.max(0, Math.min(100, Number(status.progress) || 0));
+      this.dom.updaterProgressBar.style.width = `${pct}%`;
+    }
+    if (this.dom.btnInstallUpdate) {
+      this.dom.btnInstallUpdate.style.display = state === 'downloaded' ? 'inline-flex' : 'none';
+    }
+    if (this.dom.btnCheckUpdates) {
+      this.dom.btnCheckUpdates.disabled = state === 'checking' || state === 'downloading';
+    }
+  }
+
+  async checkForUpdates() {
+    if (!window.nasArchive || !window.nasArchive.updater) return;
+    this.renderUpdateStatus({ state: 'checking' });
+    try {
+      await window.nasArchive.updater.check();
+      await this.refreshUpdateStatus();
+    } catch (e) {
+      this.renderUpdateStatus({ state: 'error', error: e.message });
+    }
+  }
+
+  async installDownloadedUpdate() {
+    if (!window.nasArchive || !window.nasArchive.updater) return;
+    const ok = await window.nasArchive.updater.install();
+    if (!ok) {
+      this.renderUpdateStatus({ state: 'error', error: 'لا يوجد تحديث جاهز للتثبيت.' });
+    }
   }
 
   async createBackup() {

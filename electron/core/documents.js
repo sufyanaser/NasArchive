@@ -56,6 +56,11 @@ class DocumentService {
       archive_file_path: docRow.archive_file_path,
       archive_checksum: docRow.archive_checksum,
       archive_size: docRow.archive_size,
+      enhanced_file_path: docRow.enhanced_file_path || null,
+      enhanced_checksum: docRow.enhanced_checksum || null,
+      enhanced_size: docRow.enhanced_size || null,
+      enhancement_status: docRow.enhancement_status || null,
+      enhancement_error: docRow.enhancement_error || null,
       thumbnail_path: docRow.thumbnail_path,
       page_count: docRow.page_count,
       status: docRow.status,
@@ -348,13 +353,15 @@ class DocumentService {
           uuid, paperless_id, title, content, correspondent_id, document_type_id, storage_path_id,
           created_date, created_at, modified_at, original_filename, original_file_path,
           original_checksum, original_size, original_mime_type, archive_filename,
-          archive_file_path, archive_checksum, archive_size, thumbnail_path, page_count,
+          archive_file_path, archive_checksum, archive_size, enhanced_file_path,
+          enhanced_checksum, enhanced_size, enhancement_status, enhancement_error,
+          thumbnail_path, page_count,
           status, is_approved_for_sync, approved_hash, reviewed_by, reviewed_at, notes
         ) VALUES (
           ?, ?, ?, ?, ?, ?, ?,
           ?, ?, ?, ?, ?,
           ?, ?, ?, ?,
-          ?, ?, ?, ?, ?,
+          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
           ?, ?, ?, ?, ?, ?
         )
       `);
@@ -379,6 +386,11 @@ class DocumentService {
         data.archive_file_path || null,
         data.archive_checksum || null,
         data.archive_size || null,
+        data.enhanced_file_path || null,
+        data.enhanced_checksum || null,
+        data.enhanced_size || null,
+        data.enhancement_status || 'PENDING',
+        data.enhancement_error || null,
         data.thumbnail_path || null,
         data.page_count || 1,
         data.status || 'APPROVED',
@@ -500,6 +512,30 @@ class DocumentService {
         sets.push('notes = ?');
         values.push(patch.notes);
       }
+      if (patch.thumbnail_path !== undefined) {
+        sets.push('thumbnail_path = ?');
+        values.push(patch.thumbnail_path || null);
+      }
+      if (patch.enhanced_file_path !== undefined) {
+        sets.push('enhanced_file_path = ?');
+        values.push(patch.enhanced_file_path || null);
+      }
+      if (patch.enhanced_checksum !== undefined) {
+        sets.push('enhanced_checksum = ?');
+        values.push(patch.enhanced_checksum || null);
+      }
+      if (patch.enhanced_size !== undefined) {
+        sets.push('enhanced_size = ?');
+        values.push(patch.enhanced_size || null);
+      }
+      if (patch.enhancement_status !== undefined) {
+        sets.push('enhancement_status = ?');
+        values.push(patch.enhancement_status || null);
+      }
+      if (patch.enhancement_error !== undefined) {
+        sets.push('enhancement_error = ?');
+        values.push(patch.enhancement_error || null);
+      }
 
       values.push(id);
       trx.prepare(`UPDATE documents SET ${sets.join(', ')} WHERE id = ?`).run(...values);
@@ -544,6 +580,45 @@ class DocumentService {
 
       return this.getDocument(id);
     });
+  }
+
+  setThumbnailPath(id, thumbnailPath) {
+    const db = dbManager.getDb();
+    const docId = Number(id);
+    if (!Number.isInteger(docId) || docId <= 0) {
+      throw new Error('Invalid document id.');
+    }
+    db.prepare('UPDATE documents SET thumbnail_path = ?, modified_at = ? WHERE id = ?')
+      .run(thumbnailPath || null, new Date().toISOString(), docId);
+    return this.getDocument(docId);
+  }
+
+  setEnhancementResult(id, result) {
+    const db = dbManager.getDb();
+    const docId = Number(id);
+    if (!Number.isInteger(docId) || docId <= 0) {
+      throw new Error('Invalid document id.');
+    }
+    const status = result && result.success ? 'SUCCESS' : 'FAILED';
+    db.prepare(`
+      UPDATE documents
+      SET enhanced_file_path = ?,
+          enhanced_checksum = ?,
+          enhanced_size = ?,
+          enhancement_status = ?,
+          enhancement_error = ?,
+          modified_at = ?
+      WHERE id = ?
+    `).run(
+      result && result.success ? result.path : null,
+      result && result.success ? result.checksum : null,
+      result && result.success ? result.size : null,
+      status,
+      result && result.success ? null : (result && result.error ? result.error : 'Enhancement failed.'),
+      new Date().toISOString(),
+      docId
+    );
+    return this.getDocument(docId);
   }
 
   /**

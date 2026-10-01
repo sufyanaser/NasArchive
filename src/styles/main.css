@@ -420,6 +420,58 @@ body {
   border-color: var(--border-focus);
 }
 
+.smart-suggest-wrapper {
+  position: relative;
+}
+
+.smart-suggest-wrapper .form-input {
+  width: 100%;
+}
+
+.smart-suggest-menu {
+  position: absolute;
+  inset-inline: 0;
+  top: calc(100% + 4px);
+  z-index: 1200;
+  display: none;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: 4px;
+  direction: rtl;
+}
+
+.smart-suggest-menu.open {
+  display: block;
+}
+
+.smart-suggest-item {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+  text-align: right;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  direction: rtl;
+}
+
+.smart-suggest-item:hover,
+.smart-suggest-item.active {
+  background: var(--bg-surface-elevated);
+  color: var(--accent-primary);
+}
+
+.smart-suggest-item.typed-value {
+  color: var(--text-secondary);
+}
+
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -821,8 +873,73 @@ body {
 .doc-thumb-container img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   object-position: top;
+  background: #f8fafc;
+  padding: 8px;
+}
+
+.doc-thumb-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--bg-surface-elevated);
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.doc-list-thumb {
+  width: 54px;
+  height: 72px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  overflow: hidden;
+  background: var(--bg-surface-elevated);
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+
+.doc-list-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: top;
+  background: #f8fafc;
+}
+
+.doc-list-thumb .doc-thumb-fallback svg {
+  width: 22px !important;
+  height: 22px !important;
+}
+
+.metadata-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.advanced-details {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  background: var(--bg-surface-elevated);
+}
+
+.advanced-details summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.advanced-details[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .doc-badge-dept {

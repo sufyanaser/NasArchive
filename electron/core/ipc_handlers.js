@@ -17,6 +17,10 @@ const backupService = require('./backup');
 const migrator = require('./migrator');
 const classification = require('./classification');
 const archiveService = require('./archive_service');
+const thumbnailService = require('./thumbnail');
+const archiveRules = require('./archive_rules');
+const enhancementService = require('./enhancement');
+const smartSuggestions = require('./smart_suggestions');
 
 function setupNativeIpcHandlers(appDataDir) {
   // 1. System & Engine Health Status
@@ -222,6 +226,38 @@ function setupNativeIpcHandlers(appDataDir) {
     }
   });
 
+  ipcMain.handle('documents:thumbnail', async (event, id) => {
+    try {
+      const docId = Number(id);
+      if (!Number.isInteger(docId) || docId <= 0) {
+        throw new Error('معرف الوثيقة غير صالح.');
+      }
+
+      const doc = docService.getDocument(docId);
+      if (!doc) throw new Error(`Document #${docId} not found.`);
+
+      if (doc.thumbnail_path) {
+        const existing = thumbnailService.readDataUrl(docId);
+        if (existing.success) return existing;
+      }
+
+      const sourcePath = doc.enhanced_file_path && fs.existsSync(doc.enhanced_file_path)
+        ? doc.enhanced_file_path
+        : doc.archive_file_path && fs.existsSync(doc.archive_file_path)
+        ? doc.archive_file_path
+        : doc.original_file_path;
+      if (!sourcePath || !fs.existsSync(sourcePath)) {
+        return { success: false, error: 'ملف المستند غير موجود لتوليد المصغّر.' };
+      }
+
+      const generated = await thumbnailService.generateForPdf(docId, sourcePath, { title: doc.title });
+      docService.setThumbnailPath(docId, generated.relativePath);
+      return thumbnailService.readDataUrl(docId);
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
   ipcMain.handle('documents:export-file', async (event, id) => {
     try {
       const doc = docService.getDocument(id);
@@ -314,6 +350,14 @@ function setupNativeIpcHandlers(appDataDir) {
       return { isDuplicate: Boolean(dup), existing: dup };
     } catch (err) {
       return { isDuplicate: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('suggestions:get', async (event, { field, query = '', context = {} } = {}) => {
+    try {
+      return smartSuggestions.getSuggestions(field, query, context);
+    } catch (err) {
+      return { success: false, error: err.message, suggestions: [] };
     }
   });
 
@@ -474,7 +518,7 @@ function setupNativeIpcHandlers(appDataDir) {
   });
 
   // 6. Stage B: Explicit Archive
-  ipcMain.handle('archive:stage', async (event, { filename, section = 'شخصي', allowDuplicate = false, title = null }) => {
+  ipcMain.handle('archive:stage', async (event, { filename, section = 'شخصي', allowDuplicate = false, allow_duplicate = false, title = null }) => {
     try {
       if (!filename || typeof filename !== 'string') {
         throw new Error('اسم الملف غير محدد.');
@@ -497,7 +541,8 @@ function setupNativeIpcHandlers(appDataDir) {
       const checksum = storage.computeFileHash(stagedPath);
       const stat = fs.statSync(stagedPath);
 
-      if (!allowDuplicate) {
+      const duplicateAllowed = Boolean(allowDuplicate || allow_duplicate);
+      if (!duplicateAllowed) {
         const dup = docService.checkDuplicate(checksum);
         if (dup) {
           return {
@@ -516,19 +561,24 @@ function setupNativeIpcHandlers(appDataDir) {
       const tempId = Date.now();
       const storedOrig = storage.storeOriginal(tempId, filename, stagedPath);
 
+      let enhancementResult = { success: false, error: null };
+      try {
+        enhancementResult = await enhancementService.enhancePdf(tempId, storedOrig.path);
+      } catch (enhErr) {
+        enhancementResult = { success: false, error: enhErr.message };
+        archiveService.log('WARN', 'Enhancement', `تعذر تحسين صورة الوثيقة قبل OCR: ${enhErr.message}`);
+      }
+
+      const ocrSourcePath = enhancementResult.success && fs.existsSync(enhancementResult.path)
+        ? enhancementResult.path
+        : storedOrig.path;
+
       // Run OCR & text extraction
       let ocrResult = { text: '', pageCount: 1, archivePdfPath: null };
       try {
-        ocrResult = await ocr.processDocumentOcr(tempId, storedOrig.path, 'ara');
+        ocrResult = await ocr.processDocumentOcr(tempId, ocrSourcePath, 'ara');
       } catch (ocrErr) {
         console.warn('OCR non-fatal warning:', ocrErr.message);
-      }
-
-      // Store Archive PDF if OCR produced one
-      let storedArch = null;
-      if (ocrResult.archivePdfPath && fs.existsSync(ocrResult.archivePdfPath)) {
-        storedArch = storage.storeArchivedPdf(tempId, today, docTitle, ocrResult.archivePdfPath);
-        try { fs.unlinkSync(ocrResult.archivePdfPath); } catch (e) {}
       }
 
       // Run AI Analyzer to extract suggested metadata
@@ -572,11 +622,37 @@ function setupNativeIpcHandlers(appDataDir) {
         if (id) customFieldValues.push({ field: id, value: aiSuggestions.recipient_suggestion.value });
       }
 
+      const suggestedType = aiSuggestions.doc_type_suggestion && aiSuggestions.doc_type_suggestion.value
+        ? aiSuggestions.doc_type_suggestion.value
+        : null;
+      const matchingDocType = suggestedType
+        ? docService.getDocumentTypes().results.find((dt) => dt.name === suggestedType)
+        : null;
+      const archivePlan = archiveRules.buildArchivePlan({
+        document_id: tempId,
+        department: section,
+        document_type_name: matchingDocType ? matchingDocType.name : suggestedType,
+        created_date: aiSuggestions.doc_date_suggestion.value || today,
+        title: aiSuggestions.title_suggestion.value || docTitle,
+        original_filename: filename,
+      });
+
+      // Store archived PDF under a policy-generated logical key.
+      let storedArch = null;
+      const archiveSourcePath = ocrResult.archivePdfPath && fs.existsSync(ocrResult.archivePdfPath)
+        ? ocrResult.archivePdfPath
+        : (enhancementResult.success && fs.existsSync(enhancementResult.path) ? enhancementResult.path : storedOrig.path);
+      storedArch = storage.storeArchivedByKey(archivePlan.storageKey, archiveSourcePath);
+      if (ocrResult.archivePdfPath && fs.existsSync(ocrResult.archivePdfPath)) {
+        try { fs.unlinkSync(ocrResult.archivePdfPath); } catch (e) {}
+      }
+
       // Create Document in Database
       const newDoc = docService.createDocument({
         title: aiSuggestions.title_suggestion.value || docTitle,
         content: ocrResult.text || '',
         created_date: aiSuggestions.doc_date_suggestion.value || today,
+        document_type_id: matchingDocType ? matchingDocType.id : null,
         original_filename: filename,
         original_file_path: storedOrig.path,
         original_checksum: storedOrig.checksum,
@@ -586,11 +662,30 @@ function setupNativeIpcHandlers(appDataDir) {
         archive_file_path: storedArch ? storedArch.path : null,
         archive_checksum: storedArch ? storedArch.checksum : null,
         archive_size: storedArch ? storedArch.size : null,
+        enhanced_file_path: enhancementResult.success ? enhancementResult.path : null,
+        enhanced_checksum: enhancementResult.success ? enhancementResult.checksum : null,
+        enhanced_size: enhancementResult.success ? enhancementResult.size : null,
+        enhancement_status: enhancementResult.success ? 'SUCCESS' : 'FAILED',
+        enhancement_error: enhancementResult.success ? null : enhancementResult.error,
         page_count: ocrResult.pageCount || 1,
         status: 'INBOX',
         tags: assignedTags,
         custom_fields: customFieldValues,
       });
+
+      let thumbnailStatus = { success: false, error: null };
+      try {
+        const thumbnailSourcePath = newDoc.enhanced_file_path && fs.existsSync(newDoc.enhanced_file_path)
+          ? newDoc.enhanced_file_path
+          : storedArch.path;
+        const thumb = await thumbnailService.generateForPdf(newDoc.id, thumbnailSourcePath, { title: newDoc.title });
+        const refreshedDoc = docService.setThumbnailPath(newDoc.id, thumb.relativePath);
+        newDoc.thumbnail_path = refreshedDoc.thumbnail_path;
+        thumbnailStatus = { success: true, path: thumb.relativePath, reused: thumb.reused };
+      } catch (thumbErr) {
+        thumbnailStatus = { success: false, error: thumbErr.message };
+        archiveService.log('WARN', 'Thumbnail', `تعذر توليد مصغر للوثيقة #${newDoc.id}: ${thumbErr.message}`);
+      }
 
       // Cleanup staged file
       storage.removeStaged(filename);
@@ -600,6 +695,11 @@ function setupNativeIpcHandlers(appDataDir) {
         status: 'SUCCESS',
         document: newDoc,
         aiSuggestions,
+        archivePlan,
+        enhancement: enhancementResult.success
+          ? { success: true, path: path.relative(storage.baseDir, enhancementResult.path), size: enhancementResult.size, processing: enhancementResult.processing }
+          : { success: false, error: enhancementResult.error },
+        thumbnail: thumbnailStatus,
       };
     } catch (err) {
       return { success: false, status: 'FAILED', error: err.message };
