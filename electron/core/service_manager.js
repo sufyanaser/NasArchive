@@ -1,7 +1,7 @@
 /**
  * NAS Archive Native — Desktop Service & Engine Orchestrator
- * Completely replaces Docker and container orchestration with instant local native services:
- * Local SQLite (WAL), Native Document Storage, Tesseract OCR, and NAPS2 Scanner Bridge.
+ * Local desktop orchestration for SQLite (WAL), native document storage,
+ * Tesseract OCR, and the NAPS2/WIA scanner bridge.
  */
 const path = require('path');
 const fs = require('fs');
@@ -125,10 +125,10 @@ class NativeServiceManager {
     const docCount = docService.getCount();
 
     return {
-      docker: true, // For backward compatibility with UI pills
-      paperless: true, // For backward compatibility with UI pills
-      bridge: true, // For backward compatibility with UI pills
-      nativeCore: true,
+      nativeCore: {
+        ok: this.initialized && integrity.ok,
+        storagePath: this.storagePath,
+      },
       database: {
         ok: integrity.ok,
         totalDocs: docCount,
@@ -141,7 +141,7 @@ class NativeServiceManager {
         detected_devices: scanners,
         count: scanners.length,
       },
-      version: '2.0.0 (Native)',
+      architecture: 'native',
     };
   }
 }
