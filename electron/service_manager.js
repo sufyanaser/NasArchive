@@ -1,5 +1,5 @@
 /**
  * NAS Archive — Service Manager Re-Export
- * Points to the new Docker-free Native Service Manager.
+ * Compatibility re-export for the native service manager.
  */
 module.exports = require('./core/service_manager');
