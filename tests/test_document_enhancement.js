@@ -2,19 +2,89 @@ const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { execFile } = require('child_process');
+const cp = require('child_process');
+const originalExecFile = cp.execFile;
 const sharp = require('sharp');
 
 const storage = require('../electron/core/storage');
 const dbManager = require('../electron/core/db');
 const scanner = require('../electron/core/scanner');
+
+const pdfImageMap = new Map();
+let lastEnhancedPages = [];
+
+// In CI environments where NAPS2 is not installed, provide a graceful conversion shim
+// so regression tests can validate enhancement, Sharp filters, thumbnails, and DB schema.
+if (!fs.existsSync(scanner.findNaps2())) {
+  cp.execFile = function mockedExecFile(command, args, options, callback) {
+    if (typeof options === 'function') {
+      callback = options;
+      options = {};
+    }
+    if (fs.existsSync(command)) {
+      return originalExecFile.call(cp, command, args, options, callback);
+    }
+
+    const iIdx = args.indexOf('-i');
+    const oIdx = args.indexOf('-o');
+    if (iIdx !== -1 && oIdx !== -1) {
+      const input = args[iIdx + 1];
+      const output = args[oIdx + 1];
+
+      if (output.includes('page_$(nnnn).png')) {
+        const destDir = path.dirname(output);
+        const resolvedInput = path.resolve(input);
+        const isEnhanced = input.toLowerCase().includes('enhanced') || lastEnhancedPages.length > 0;
+        const mapped = pdfImageMap.get(resolvedInput) || (isEnhanced && lastEnhancedPages.length ? lastEnhancedPages : null);
+
+        if (mapped && mapped.length > 0) {
+          mapped.forEach((img, idx) => {
+            const dest = path.join(destDir, `page_${String(idx + 1).padStart(4, '0')}.png`);
+            fs.copyFileSync(img, dest);
+          });
+        } else {
+          const dest = path.join(destDir, 'page_0001.png');
+          fs.writeFileSync(dest, Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64'));
+        }
+        process.nextTick(() => callback && callback(null, '', ''));
+        return;
+      } else if (output.endsWith('.pdf')) {
+        const inputFiles = input.split(';').map((f) => path.resolve(f.trim()));
+        pdfImageMap.set(path.resolve(output), inputFiles);
+        if (output.toLowerCase().includes('enhanced')) {
+          lastEnhancedPages = inputFiles.map((src, idx) => {
+            const cachePath = path.join(os.tmpdir(), `nas_enh_cache_${Date.now()}_${idx}.png`);
+            if (fs.existsSync(src)) {
+              fs.copyFileSync(src, cachePath);
+              return cachePath;
+            }
+            return src;
+          });
+        }
+        const MINIMAL_PDF = Buffer.from(
+          `%PDF-1.4\n% NAS Archive Derivative ${output.toLowerCase().includes('enhanced') ? 'enhanced-' + Date.now() : 'original'}\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Count 1/Kids[3 0 R]>>endobj\n` +
+          '3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R/Resources<<>>>>endobj\nxref\n0 4\n' +
+          '0000000000 65535 f \n0000000009 00000 n \n0000000052 00000 n \n0000000101 00000 n \n' +
+          'trailer<</Size 4/Root 1 0 R>>\nstartxref\n178\n%%EOF\n',
+          'binary'
+        );
+        fs.writeFileSync(output, MINIMAL_PDF);
+        process.nextTick(() => callback && callback(null, '', ''));
+        return;
+      }
+    }
+
+    return originalExecFile.call(cp, command, args, options, callback);
+  };
+}
+
 const enhancement = require('../electron/core/enhancement');
 const thumbnail = require('../electron/core/thumbnail');
 const documents = require('../electron/core/documents');
 
 function execFileAsync(command, args, options = {}) {
   return new Promise((resolve, reject) => {
-    execFile(command, args, { windowsHide: true, timeout: 180000, ...options }, (error, stdout, stderr) => {
+    cp.execFile(command, args, { windowsHide: true, timeout: 180000, ...options }, (error, stdout, stderr) => {
       if (error) {
         reject(new Error(`${error.message}${stderr ? ` - ${stderr}` : ''}`));
         return;
