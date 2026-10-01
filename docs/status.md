@@ -1,153 +1,43 @@
-# نتائج التنفيذ والتحقق الشامل — 2026-09-23
+# NAS Archive — Current Status
 
-## المنجز الفعلي المكتمل
+## Runtime
 
-1. **بيئة Docker وWSL والخدمات الأساسية**:
-   - تعمل خدمات `nas-archive` بحالة صحية (`healthy`):
-     - `webserver`: صورة Paperless-ngx الرسمية المستقلة `3.2.1` على المنفذ `127.0.0.1:8000`.
-     - `db`: صورة PostgreSQL 18 بمخزن دائم محلي.
-     - `broker`: صورة Valkey 9-alpine بمخزن دائم محلي.
-   - التحقق من صفحة تسجيل الدخول واستجابتها برمز `HTTP 200`، وتوفر حزم OCR للغتين العربية (`ara`) والإنجليزية (`eng`).
-   - إيقاف بيئة الاستعادة المعزولة بأمان مع الحفاظ على وحدات التخزين.
+NAS Archive يعمل كتطبيق Electron محلي. لا يعتمد التشغيل الحالي على Docker أو WSL أو Paperless-ngx.
 
-2. **تكامل الماسح الضوئي (NAPS2 Integration)**:
-   - تم تثبيت NAPS2 الإصدار `8.3.2` على نظام Windows وإضافته إلى مسار النظام.
-   - تم فحص واكتشاف أجهزة المسح الضوئي المتاحة: تم اكتشاف الماسح `EPSON WF-C5890 Series` عبر مشغل WIA والشبكة.
-   - تطوير وحدة المعالجة [scripts/scanner_ingest.py](file:///C:/Users/SUFYAN/.codex/.chatgpt-projects/g-p-6a37dcc5580c8191b72eebf36d2e2d37/NasArchive/scripts/scanner_ingest.py) وسكربت PowerShell [scripts/Scan-Document.ps1](file:///C:/Users/SUFYAN/.codex/.chatgpt-projects/g-p-6a37dcc5580c8191b72eebf36d2e2d37/NasArchive/scripts/Scan-Document.ps1).
-   - دعم المسح الضوئي متعدد الصفحات (Multipage PDF) بدقة 300 DPI وA4 ومحاذاة آلية (Deskew).
-   - عزل مرحلة الكتابة في مجلد `runtime/staging` ثم النقل الذري (Atomic Move) إلى مجلد القسم المستهدف لتفادي قراءة ملفات ناقصة.
-   - حفظ النسخ الأصلية الممسوحة فوراً في `runtime/scanned_archive/`.
-   - كشف الوثائق المكررة آلياً ببصمة SHA-256 ورفض إعادة الاستيراد المكرر.
-   - دعم استيراد ملفات PDF يدوياً عبر CLI.
+المكونات التشغيلية:
 
-3. **المعالجة الذكية للوثائق العربية (AI Document Processing)**:
-   - تطوير محلل الوثائق الذكي المحلي [scripts/ai_processor.py](file:///C:/Users/SUFYAN/.codex/.chatgpt-projects/g-p-6a37dcc5580c8191b72eebf36d2e2d37/NasArchive/scripts/ai_processor.py).
-   - استخراج وتطبيع العناوين الرسمية، أرقام الكتب الإدارية مع حفظ الأصفار البادئة والشرطات (مثل `0042/ص-2026`)، أرقام القيود، والتواريخ والجهات.
-   - التصنيف الآلي للأقسام الأربعة (`شخصي`، `الرنين`، `تناسق`، `NAS FM`) ونوع المستند (`كتاب وارد`، `كتاب صادر`، `كتاب داخلي`) بمؤشرات ثقة عددية (Confidence Scores).
-   - كشف الحقول الرسمية الناقصة (Missing Metadata Detection).
-   - **قاعدة الأمان الصارمة**: المعالجة الذكية تعمل محلياً دون إرسال وثائق للخارج، ولا تمنح موافقة المزامنة السحابية تلقائياً (`معتمد للمزامنة` يبقى دائماً `False` حتى يقرره المراجع البشري).
+- Native Electron Core.
+- SQLite + WAL + FTS5.
+- Native document storage.
+- OCR عربي/إنجليزي.
+- NAPS2 / WIA scanner integration.
+- Secure IPC.
+- GitHub Release auto-updater.
 
-4. **المزامنة السحابية أحادية الاتجاه (Paperless → Drive → Sheets)**:
-   - تطوير محول Google Cloud للإنتاج [scripts/google_cloud_adapter.py](file:///C:/Users/SUFYAN/.codex/.chatgpt-projects/g-p-6a37dcc5580c8191b72eebf36d2e2d37/NasArchive/scripts/google_cloud_adapter.py) وسكربت المزامنة [scripts/sync_cloud.py](file:///C:/Users/SUFYAN/.codex/.chatgpt-projects/g-p-6a37dcc5580c8191b72eebf36d2e2d37/NasArchive/scripts/sync_cloud.py).
-   - دعم مصادقة Google Service Account وOAuth، والتحكم في مهلة الشبكة وتكرار المحاولات مع التراجع الزمني الأسي (Exponential Backoff).
-   - تنظيم المجلدات في Drive على أساس القسم والسنة (`<القسم>/<السنة>`).
-   - فهرسة البيانات في Google Sheets بـ 16 عموداً شاملاً المفتاح المستقر والبصمة والتواريخ والأرقام المحفوظة.
-   - منع التكرار التام عبر الاستعلام المسبق عن `appProperties` بالمفتاح المستقر قبل الرفع.
-   - إمكانية استئناف خطوة Sheets وحدها عند الفشل دون إعادة رفع الملف إلى Drive.
-   - كشف التعديل اللاحق بعد الاعتماد وطلب تدقيق جديد للبصمة المعدلة.
+## Release baseline
 
-5. **التحقق من دورة الحياة التشغيلية الكاملة (Complete Operational Lifecycle)**:
-   - تم تنفيذ والتحقق من المراحل العشر في [scripts/test_lifecycle.py](file:///C:/Users/SUFYAN/.codex/.chatgpt-projects/g-p-6a37dcc5580c8191b72eebf36d2e2d37/NasArchive/scripts/test_lifecycle.py):
-     `المسح/التجهيز ← الاستيراد والحفظ الأصلي ← كشف التكرار ← استهلاك Paperless وOCR ← البحث النصي المزدوج ← استخراج المقترحات الذكية ← المراجعة والتصنيف البشري ← المزامنة السحابية إلى Drive وSheets ← التحقق من ثبات الإعادة (Idempotency) ← إعادة ضبط حالة الأمان`.
+- Version: 2.2.1
+- Development source of truth: `develop`
+- Windows installer: NSIS
+- Release publishing: GitHub Actions
+- Update feed: GitHub Releases
 
-6. **بوابة وخدمة الماسح الضوئي والاستيراد السريع (Scanner Web UI & Local Bridge v1.1.0)**:
-   - **المعمارية النظيفة المستقلة**: بناء خادم وسيط محلي خفيف وآمن [scripts/scanner_bridge.py](file:///C:/Users/SUFYAN/.codex/.chatgpt-projects/g-p-6a37dcc5580c8191b72eebf36d2e2d37/NasArchive/scripts/scanner_bridge.py) مقيد برمجياً بـ `127.0.0.1:8001` دون أي تعديل أو Fork هش لحاوية Paperless-ngx.
-   - **واجهة المستخدم العربية الأصيلة (RTL)**: واجهة [web/index.html](file:///C:/Users/SUFYAN/.codex/.chatgpt-projects/g-p-6a37dcc5580c8191b72eebf36d2e2d37/NasArchive/web/index.html) متكاملة وسريعة تضم:
-     - بطاقات اختيار القسم: `شخصي`، `الرنين`، `تناسق`، `NAS FM`.
-     - تحكم كامل بمواصفات المسح: اختيار الماسح (`EPSON WF-C5890 Series` عبر WIA)، نوع التغذية (مسطح Flatbed / مغذي ADF وجه واحد / مغذي ADF وجهين Duplex)، نمط الألوان (ملون / رمادي / أسود وأبيض)، الدقة (150, 300, 600 DPI)، وتصحيح الميلان (Deskew).
-     - مؤشر مسار حي (Live Progress Tracker) يراقب 5 مراحل متتالية حتى اكتمال الأرشفة.
-     - زر الانتقال المباشر للوثيقة المفهرسة داخل Paperless (`http://localhost:8000/documents/<id>/details`).
-     - تبويب استيراد يدوي يدعم السحب والإفلات (Drag & Drop) لملفات PDF وصور PNG وJPG وTIFF.
-     - كشف فوري للتكرار ببصمة SHA-256 مع تنبيه واضح وخيار لتجاوز التكرار عند الرغبة.
-   - **التشغيل الآلي والخدمة المستمرة على Windows**:
-     - تطوير [scripts/Start-ScannerBridge.ps1](file:///C:/Users/SUFYAN/.codex/.chatgpt-projects/g-p-6a37dcc5580c8191b72eebf36d2e2d37/NasArchive/scripts/Start-ScannerBridge.ps1) للتشغيل بالخلفية بدون نوافذ عبر `pythonw.exe` مع فحص الصحة الفوري.
-     - تطوير [scripts/Stop-ScannerBridge.ps1](file:///C:/Users/SUFYAN/.codex/.chatgpt-projects/g-p-6a37dcc5580c8191b72eebf36d2e2d37/NasArchive/scripts/Stop-ScannerBridge.ps1) للإيقاف الآمن وتحرير المنفذ.
-     - تطوير [scripts/Register-StartupBridge.ps1](file:///C:/Users/SUFYAN/.codex/.chatgpt-projects/g-p-6a37dcc5580c8191b72eebf36d2e2d37/NasArchive/scripts/Register-StartupBridge.ps1) لبدء التشغيل التلقائي مع تسجيل دخول Windows.
-     - تطوير [scripts/Create-DesktopShortcuts.ps1](file:///C:/Users/SUFYAN/.codex/.chatgpt-projects/g-p-6a37dcc5580c8191b72eebf36d2e2d37/NasArchive/scripts/Create-DesktopShortcuts.ps1) لإنشاء اختصارات سطح المكتب الرسمية.
-   - **التحقق العملي الفعلي**: تم إجراء مسح فيزيائي حقيقي للماسح المتصل `EPSON WF-C5890 Series` واستيراد ملفات واجتياز دورة الأرشفة بالكامل.
+## Verification gates
 
----
+قبل اعتماد أي Release:
 
-## ملخص الفحوصات الآلية (48 فحصاً ناجحاً بنسبة 100%)
+1. `npm ci`
+2. JavaScript syntax verification.
+3. `npm test`
+4. Windows packaging.
+5. Installer artifact verification.
+6. Python CI where applicable.
 
-- **فحوصات التأسيس والكتالوج (7 فحوصات)**: `tests/test_bootstrap.py`
-- **فحوصات عقد المزامنة والسجل الدائم (9 فحوصات)**: `tests/test_sync_contract.py`
-- **فحوصات استيراد الماسح الضوئي وكشف التكرار (6 فحوصات)**: `tests/test_scanner_ingest.py`
-- **فحوصات المعالجة الذكية واستخراج الحقول (8 فحوصات)**: `tests/test_ai_processor.py`
-- **فحوصات خادم الجسر ومعاينة الروابط العربية والبث الجزئي (17 فحصاً)**: `tests/test_scanner_bridge.py`
-- **فحص عقد دورة الحياة التشغيلية (فحص واحد)**: `tests/test_lifecycle_unit.py`
-- **فحوصات التشغيل المباشرة الميدانية**:
-  - `scripts/Test-Runtime.ps1`: نجاح تام للحاويات ولغات OCR العربية والإنجليزية وصفحة الدخول.
-  - `scripts/test_custom_fields.py`: نجاح مطابقة الكتالوج وحفظ الأصفار والشرطات واسترجاعها عبر API.
-  - `scripts/test_bridge_live.py`: نجاح استيراد وتتبع واكتمال الأرشفة عبر واجهة الجسر.
-  - `scripts/test_lifecycle.py`: نجاح المراحل العشر لدورة حياة الأرشفة الميدانية.
+## Local verification still required
 
----
+الاختبارات الآلية لا تستبدل الاختبارات الفيزيائية التالية:
 
-## 8. التحول المكتبي الشامل وتطبيق سطح المكتب المستقل (v1.2.0 - Desktop Transformation)
-
-1. **تطبيق مكتبي متكامل ومستقل (Electron Standalone)**:
-   - تشغيل النظام بالكامل داخل نافذة مكتبية واحدة دون الحاجة لفتح المتصفح أو موجه الأوامر PowerShell أو إدارة Docker يدوياً.
-   - اعتماد أيقونة النظام الرسمية `assets/Dev-printer.ico` للنافذة، شريط المهام، شريط النظام (System Tray)، واختصار سطح المكتب.
-   - قفل التشغيل الأحادي (Single-Instance Lock) لمنع تكرار فتح التطبيق.
-   - نسخة تشغيلية محمولة جاهزة: `dist/win-unpacked/NAS Archive.exe`.
-2. **سير عمل المسح الضوئي ثنائي المراحل (Two-Stage Scanning)**:
-   - الفصل التام بين المسح المبدئي والأرشفة:
-     - **المرحلة الأولى**: مسح المستند وتوليد المعاينة فوراً بالحجم الكامل وعرض الصفحات المتعددة عبر PDF.js دون رفعه إلى Paperless.
-     - **المرحلة الثانية**: الأرشفة الصريحة بنقر زر «أرشفة» أو تكرار المحاولة بزر «إعادة المسح» (Rescan) مع الاحتفاظ بالنسخة السابقة حتى نجاح البديل.
-3. **إدارة المستندات الموحدة بهوية NAS Archive**:
-   - تصفح المستندات بنمط الشبكة أو القائمة، تصفية الأقسام الأربعة، تعديل البيانات الوصفية، واعتماد الوثائق المعلقة دون الحاجة لفتح واجهة Paperless الأصلية.
-4. **أتمتة الخدمات في الخلفية (Silent Service Orchestration)**:
-   - فحص وتشغيل Docker Desktop والحاويات وجسر الماسح تلقائياً مع شاشة بدء تشغيل مصغرة وإشعارات باللغة العربية.
-
----
-
-## 9. إصلاح معاينة PDF والروابط العربية وقنوات IPC المحلية (Release v1.2.1)
-
-1. **حل خطأ Missing PDF للمستندات الممسوحة ذات الأسماء العربية**:
-   - فك ترميز أسماء الملفات (`urllib.parse.unquote`) في مسارات GET وDELETE ونقاط المعاينة في خادم الجسر المحلي.
-   - معالجة ترويسة `Content-Disposition` وفق معيار RFC 5987 / RFC 6266 لضمان التوافق التام مع أسماء الملفات العربية.
-   - إضافة ترويسة `Range` إلى ترويسات CORS ودعم طلبات المقاطع الجزئية `206 Partial Content` لدعم استعراض ملفات PDF متعددة الصفحات.
-2. **قناة قراءة محلية مباشرة عبر Electron IPC (`staging:read` / `staging:validate`)**:
-   - توفير وصول محلي سريع وآمن 100% دون أي اتصال شبكي أو تعريض للبيانات، مما يلغي تماماً مشاكل التشفير بالشبكة ويوفر سرعة استعراض فورية.
-3. **ضمانات الأمان ومنع الأرشفة التالفة**:
-   - التحقق من وجود الملف وسلامة ترويسة `%PDF-` وحجم الملف قبل السماح بالأرشفة، وتعطيل زر «أرشفة» عند غياب الملف أو تلفه، مع إبقاء زر «إعادة المسح» نشطاً.
-   - إضافة خيار «إعادة محاولة المعاينة» داخل مستعرض PDF لإعادة المحاولة دون حذف أو إعادة مسح الوثيقة الممسوحة.
-4. **حزمة التثبيت الرسمية المحدثة**:
-   - إنتاج وتوثيق `dist/NAS Archive Setup 1.2.1.exe` (118.4 ميجابايت).
-5. **الاختبارات الآلية**:
-   - نجاح جميع الاختبارات الـ 48 بنسبة 100% (`python -m unittest discover -s tests -p "test_*.py"`).
-
----
-
-## 10. التحول الجذري إلى تطبيق Windows مستقل تماماً (Release v2.0.0 — NAS Archive Native)
-
-1. **الاستقلال الكامل عن Docker وWSL**:
-   - التخلص التام من الاعتماد على Docker Desktop أو Docker Engine أو WSL 2 أو حاويات Linux أو فتح المتصفح الخارجي.
-   - تحويل النظام إلى تطبيق مكتبي ذاتي الاحتواء بنسبة 100% يعمل مباشرة على نظام Windows 11.
-   - إبقاء بيانات وحاويات Paperless القديمة كنسخة احتياطية آمنة (Rollback Safe Archive) دون المساس بها.
-
-2. **معمارية النواة المحلية (Native Core Engine)**:
-   - **قاعدة بيانات SQLite 3.47+ مدمجة محلياً** عبر `node:sqlite` بوضع WAL والتحقق الصارم من المفاتيح الأجنبية `PRAGMA foreign_keys = ON;`.
-   - **محرك البحث النصي العربي المتقدم (FTS5)**: يدعم تطبيع النصوص العربية وإزالة التشكيل وتوحيد الألف والتاء المربوطة والبحث بالبادئات والكلمات.
-   - **محرك OCR مدمج للغتين العربية والإنجليزية**: دعم Tesseract 5.4 وNAPS2 CLI مع تضمين ملفات النماذج `ara.traineddata` و`eng.traineddata` داخل حزمة التوزيع.
-   - **حماية مسار التخزين ومنع Path Traversal**: مسارات تخزين محلية آمنة تدعم أسماء الملفات العربية بالكامل (`originals/`، `archive/`، `staging/`، `ocr/`، `backups/`).
-   - **حفظ سلامة البيانات والأرقام الإدارية**: الحفاظ الكامل على الأصفار البادئة والشرطات في أرقام الكتب والقيود (`0042/ص-2026`، `00987-ق`).
-   - **محرك النسخ الاحتياطي والاستعادة الذاتي**: حزم نسخ احتياطي متكاملة للملفات وقاعدة البيانات مع فحص ومطابقة بصمات SHA-256 بنسبة 100%.
-
-3. **قنوات اتصال آمنة ومغلقة (Zero Network Exposure IPC)**:
-   - إلغاء جميع المنافذ الشبكية المحلية المفتوحة (لا يوجد منفذ 8000 ولا منفذ 8001).
-   - توجيه كافة طلبات الواجهة (المسح، الأرشفة، البحث، التحديث، المعاينة، الاستيراد) عبر بروتوكول Electron IPC المؤمن ومعزول السياق (`contextIsolation: true`, `nodeIntegration: false`).
-
-4. **ترحيل ومطابقة جميع وثائق Paperless السابقة (12/12 وثيقة بنسبة 100%)**:
-   - ترحيل فوري من لقطة التصدير الرسمية `runtime/export/live-snapshot-20260924`.
-   - مطابقة متطابقة لكافة الملفات الأصلية، النسخ المؤرشفة، نصوص OCR، الوسوم، والبيانات الوصفية المخصصة.
-
-5. **التحقق والاختبارات الشاملة (جميع الفحوصات بنسبة 100%)**:
-   - **فحوصات النواة المحلية (`tests/test_native_core.js`)**: 9/9 مراحل نجحت بنسبة 100%.
-   - **فحوصات البايثون وعقود التكامل (`tests/test_*.py`)**: 48/48 فحصاً ناجحاً بنسبة 100%.
-   - **فحص دورة حياة Electron الحي (`scripts/verify_electron_app.js`)**: نجاح تام لكافة المراحل واكتشاف الماسح الضوئي الفيزيائي `EPSON WF-C5890 Series`.
-
-6. **حزمة التثبيت المستقلة الرسمية (Windows NSIS Installer)**:
-   - **الملف**: `dist/NAS Archive Setup 2.0.0.exe`
-   - **الحجم**: 122.45 ميجابايت (128,393,264 بايت)
-   - **بصمة التشفير (SHA-256)**: `1C89AD24F37DEEB6A5EBE9F96EFBD641C35F2CDCF63D8C3348055761FA6F0E80`
-
----
-
-## الحدود والمتطلبات الخارجية
-
-1. **الماسح الضوئي الفعلي**: تم الربط الفعلي بنجاح مع `EPSON WF-C5890 Series` عبر WIA ونظام NAPS2. يمكن للمستخدم بدء المسح بضغطة زر واحدة من تطبيق سطح المكتب المستقل عبر أيقونة `NAS Archive` على سطح المكتب.
-2. **الربط السحابي الفعلي (Live Google Cloud)**:
-   - المكونات البرمجية جاهزة ومختبرة محلياً 100%.
-   - للربط المباشر مع سحابة Google، يلزم وضع ملف الاعتماد في `runtime/google_credentials.json` وتحديد متغيرات البيئة `GOOGLE_DRIVE_FOLDER_ID` و`GOOGLE_SHEETS_SPREADSHEET_ID`.
+- Epson/NAPS2 scan from a real device.
+- OCR accuracy on representative Arabic documents.
+- Backup then restore on a disposable test archive.
+- Installed-app update flow between two published versions.
