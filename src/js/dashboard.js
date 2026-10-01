@@ -105,6 +105,12 @@ class DashboardController {
         this.dom.healthNative.querySelector('span:last-child').textContent = isOnline ? 'النواة المحلية جاهزة' : 'النواة المحلية غير جاهزة';
       }
 
+      if (this.dom.healthDatabase) {
+        const dbOk = Boolean(healthData.database && healthData.database.ok);
+        this.dom.healthDatabase.className = `status-pill ${dbOk ? 'online' : 'offline'}`;
+        this.dom.healthDatabase.querySelector('span:last-child').textContent = dbOk ? 'SQLite سليمة' : 'SQLite تحتاج فحصاً';
+      }
+
       if (this.dom.healthScanner) {
         const devs = (healthData.scanner && healthData.scanner.detected_devices) || [];
         const isDetected = devs.length > 0;
