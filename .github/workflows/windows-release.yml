@@ -4,12 +4,44 @@ on:
   push:
     tags:
       - 'v*'
+    branches:
+      - 'release-publish/**'
 
 permissions:
   contents: write
 
 jobs:
+  create-tag:
+    if: github.ref_type == 'branch'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout release source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate version and create release tag
+        shell: bash
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          EXPECTED_BRANCH="release-publish/v${VERSION}"
+          if [ "${GITHUB_REF_NAME}" != "${EXPECTED_BRANCH}" ]; then
+            echo "Expected branch ${EXPECTED_BRANCH}, got ${GITHUB_REF_NAME}" >&2
+            exit 1
+          fi
+          TAG="v${VERSION}"
+          if git rev-parse "${TAG}" >/dev/null 2>&1; then
+            echo "Tag ${TAG} already exists; refusing to overwrite." >&2
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${TAG}" -m "NAS Archive ${TAG}"
+          git push origin "${TAG}"
+
   release-windows:
+    if: github.ref_type == 'tag'
     runs-on: windows-latest
 
     steps:
