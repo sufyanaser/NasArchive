@@ -174,6 +174,43 @@ class DocumentStorage {
   }
 
   /**
+   * Store an archived PDF under a logical policy-generated key.
+   */
+  storeArchivedByKey(storageKey, sourcePdfPath) {
+    const safeParts = String(storageKey || '')
+      .split(/[\\/]+/)
+      .map((part) => this.sanitizeFilename(part))
+      .filter(Boolean);
+    if (safeParts.length === 0) {
+      throw new Error('Archive storage key is empty.');
+    }
+
+    const filename = safeParts[safeParts.length - 1].toLowerCase().endsWith('.pdf')
+      ? safeParts[safeParts.length - 1]
+      : `${safeParts[safeParts.length - 1]}.pdf`;
+    safeParts[safeParts.length - 1] = filename;
+
+    const relativeKey = path.join(...safeParts);
+    const targetPath = path.join(this.dirs.archive, relativeKey);
+    const targetDir = path.dirname(targetPath);
+    fs.mkdirSync(targetDir, { recursive: true });
+
+    const tempPath = path.join(targetDir, `.tmp_${Date.now()}_${filename}`);
+    fs.copyFileSync(sourcePdfPath, tempPath);
+    fs.renameSync(tempPath, targetPath);
+
+    const stat = fs.statSync(targetPath);
+    const checksum = this.computeFileHash(targetPath);
+
+    return {
+      filename: relativeKey,
+      path: targetPath,
+      size: stat.size,
+      checksum,
+    };
+  }
+
+  /**
    * Save extracted OCR text to `ocr/` directory.
    */
   storeOcrText(docId, rawText) {

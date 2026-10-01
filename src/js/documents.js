@@ -522,12 +522,8 @@ class DocumentsController {
 
       card.innerHTML = `
         <input type="checkbox" class="doc-card-checkbox" ${isSelected ? 'checked' : ''} title="تحديد الوثيقة">
-        <div class="doc-thumb-container">
-          <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: var(--bg-surface-elevated); color: var(--text-muted);">
-            <svg style="width: 36px; height: 36px;" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
-            </svg>
-          </div>
+        <div class="doc-thumb-container" data-doc-id="${doc.id}" title="فتح الوثيقة">
+          ${this._thumbnailFallbackHtml('جاري تحميل المصغّر...')}
           <div class="doc-badge-dept">${deptName}</div>
           ${isPending ? '<div style="position: absolute; bottom: 8px; right: 8px; background: #f59e0b; color: #0f172a; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 700;">بانتظار المراجعة</div>' : ''}
           ${corrName ? `<div style="position: absolute; bottom: 8px; left: 8px; background: rgba(59, 130, 246, 0.9); color: white; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 600;">${corrName}</div>` : ''}
@@ -562,6 +558,7 @@ class DocumentsController {
         this.downloadDocumentDirect(doc.id);
       });
 
+      this._loadThumbnailInto(card.querySelector('.doc-thumb-container'), doc);
       card.addEventListener('click', () => this.openDocumentModal(doc));
       this.dom.grid.appendChild(card);
     });
@@ -629,6 +626,9 @@ class DocumentsController {
       return `
         <div class="doc-list-row ${isSelected ? 'selected' : ''}" data-id="${doc.id}">
           <input type="checkbox" class="doc-row-checkbox" data-id="${doc.id}" ${isSelected ? 'checked' : ''}>
+          <div class="doc-list-thumb" data-doc-id="${doc.id}" onclick="window.documentsController.openDocumentModalById(${doc.id})">
+            ${this._thumbnailFallbackHtml('')}
+          </div>
           <div style="flex: 1; min-width: 0;" onclick="window.documentsController.openDocumentModalById(${doc.id})">
             <div style="font-weight: 700; font-size: 13px;">${doc.title}</div>
             <div style="font-size: 11px; color: var(--text-muted); margin-top: 2px;">
@@ -650,6 +650,46 @@ class DocumentsController {
         this.toggleDocSelection(id, chk.checked);
       });
     });
+    this.dom.listContainer.querySelectorAll('.doc-list-thumb').forEach((thumb) => {
+      const doc = this.documents.find((d) => d.id === parseInt(thumb.dataset.docId, 10));
+      if (doc) this._loadThumbnailInto(thumb, doc, true);
+    });
+  }
+
+  _thumbnailFallbackHtml(label = 'مصغّر غير متاح') {
+    return `
+      <div class="doc-thumb-fallback">
+        <svg style="width: 34px; height: 34px;" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
+        </svg>
+        ${label ? `<span>${label}</span>` : ''}
+      </div>
+    `;
+  }
+
+  async _loadThumbnailInto(container, doc, compact = false) {
+    if (!container || !doc || !window.api || !window.api.getDocumentThumbnail) return;
+    try {
+      const res = await window.api.getDocumentThumbnail(doc.id);
+      if (!res || !res.success || !res.dataUrl) {
+        container.classList.add('thumb-missing');
+        container.querySelector('.doc-thumb-fallback span')?.replaceChildren(document.createTextNode('مصغّر غير متاح'));
+        return;
+      }
+      const img = document.createElement('img');
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      img.alt = doc.title || 'Document thumbnail';
+      img.src = res.dataUrl;
+      img.addEventListener('error', () => {
+        container.innerHTML = this._thumbnailFallbackHtml('تعذر تحميل المصغّر');
+      });
+      container.querySelector('.doc-thumb-fallback')?.remove();
+      container.prepend(img);
+      container.classList.toggle('compact-thumb', compact);
+    } catch (e) {
+      container.innerHTML = this._thumbnailFallbackHtml('تعذر تحميل المصغّر');
+    }
   }
 
   _showViewContainer(mode) {

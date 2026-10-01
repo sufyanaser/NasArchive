@@ -500,6 +500,10 @@ class DocumentService {
         sets.push('notes = ?');
         values.push(patch.notes);
       }
+      if (patch.thumbnail_path !== undefined) {
+        sets.push('thumbnail_path = ?');
+        values.push(patch.thumbnail_path || null);
+      }
 
       values.push(id);
       trx.prepare(`UPDATE documents SET ${sets.join(', ')} WHERE id = ?`).run(...values);
@@ -544,6 +548,17 @@ class DocumentService {
 
       return this.getDocument(id);
     });
+  }
+
+  setThumbnailPath(id, thumbnailPath) {
+    const db = dbManager.getDb();
+    const docId = Number(id);
+    if (!Number.isInteger(docId) || docId <= 0) {
+      throw new Error('Invalid document id.');
+    }
+    db.prepare('UPDATE documents SET thumbnail_path = ?, modified_at = ? WHERE id = ?')
+      .run(thumbnailPath || null, new Date().toISOString(), docId);
+    return this.getDocument(docId);
   }
 
   /**

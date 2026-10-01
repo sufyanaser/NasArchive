@@ -6,7 +6,7 @@
   "scripts": {
     "start": "electron .",
     "test": "npm run test:js",
-    "test:js": "node tests/test_archive_restoration_regression.js && node tests/test_scanner_preview_regression.js",
+    "test:js": "node tests/test_archive_restoration_regression.js && node tests/test_scanner_preview_regression.js && node tests/test_thumbnail_archive_rules.js",
     "test:native": "node tests/test_native_core.js",
     "build": "electron-builder --dir",
     "dist": "electron-builder --win nsis"
@@ -24,7 +24,8 @@
       "target": [
         "nsis"
       ],
-      "icon": "assets/Dev-printer.ico"
+      "icon": "assets/Dev-printer.ico",
+      "artifactName": "NAS-Archive-Setup-${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,

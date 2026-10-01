@@ -17,6 +17,8 @@ const backupService = require('./backup');
 const migrator = require('./migrator');
 const classification = require('./classification');
 const archiveService = require('./archive_service');
+const thumbnailService = require('./thumbnail');
+const archiveRules = require('./archive_rules');
 
 function setupNativeIpcHandlers(appDataDir) {
   // 1. System & Engine Health Status
@@ -217,6 +219,36 @@ function setupNativeIpcHandlers(appDataDir) {
         size: buffer.length,
         mimeType: doc.original_mime_type,
       };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('documents:thumbnail', async (event, id) => {
+    try {
+      const docId = Number(id);
+      if (!Number.isInteger(docId) || docId <= 0) {
+        throw new Error('معرف الوثيقة غير صالح.');
+      }
+
+      const doc = docService.getDocument(docId);
+      if (!doc) throw new Error(`Document #${docId} not found.`);
+
+      if (doc.thumbnail_path) {
+        const existing = thumbnailService.readDataUrl(docId);
+        if (existing.success) return existing;
+      }
+
+      const sourcePath = doc.archive_file_path && fs.existsSync(doc.archive_file_path)
+        ? doc.archive_file_path
+        : doc.original_file_path;
+      if (!sourcePath || !fs.existsSync(sourcePath)) {
+        return { success: false, error: 'ملف المستند غير موجود لتوليد المصغّر.' };
+      }
+
+      const generated = await thumbnailService.generateForPdf(docId, sourcePath, { title: doc.title });
+      docService.setThumbnailPath(docId, generated.relativePath);
+      return thumbnailService.readDataUrl(docId);
     } catch (err) {
       return { success: false, error: err.message };
     }
@@ -474,7 +506,7 @@ function setupNativeIpcHandlers(appDataDir) {
   });
 
   // 6. Stage B: Explicit Archive
-  ipcMain.handle('archive:stage', async (event, { filename, section = 'شخصي', allowDuplicate = false, title = null }) => {
+  ipcMain.handle('archive:stage', async (event, { filename, section = 'شخصي', allowDuplicate = false, allow_duplicate = false, title = null }) => {
     try {
       if (!filename || typeof filename !== 'string') {
         throw new Error('اسم الملف غير محدد.');
@@ -497,7 +529,8 @@ function setupNativeIpcHandlers(appDataDir) {
       const checksum = storage.computeFileHash(stagedPath);
       const stat = fs.statSync(stagedPath);
 
-      if (!allowDuplicate) {
+      const duplicateAllowed = Boolean(allowDuplicate || allow_duplicate);
+      if (!duplicateAllowed) {
         const dup = docService.checkDuplicate(checksum);
         if (dup) {
           return {
@@ -522,13 +555,6 @@ function setupNativeIpcHandlers(appDataDir) {
         ocrResult = await ocr.processDocumentOcr(tempId, storedOrig.path, 'ara');
       } catch (ocrErr) {
         console.warn('OCR non-fatal warning:', ocrErr.message);
-      }
-
-      // Store Archive PDF if OCR produced one
-      let storedArch = null;
-      if (ocrResult.archivePdfPath && fs.existsSync(ocrResult.archivePdfPath)) {
-        storedArch = storage.storeArchivedPdf(tempId, today, docTitle, ocrResult.archivePdfPath);
-        try { fs.unlinkSync(ocrResult.archivePdfPath); } catch (e) {}
       }
 
       // Run AI Analyzer to extract suggested metadata
@@ -572,11 +598,37 @@ function setupNativeIpcHandlers(appDataDir) {
         if (id) customFieldValues.push({ field: id, value: aiSuggestions.recipient_suggestion.value });
       }
 
+      const suggestedType = aiSuggestions.doc_type_suggestion && aiSuggestions.doc_type_suggestion.value
+        ? aiSuggestions.doc_type_suggestion.value
+        : null;
+      const matchingDocType = suggestedType
+        ? docService.getDocumentTypes().results.find((dt) => dt.name === suggestedType)
+        : null;
+      const archivePlan = archiveRules.buildArchivePlan({
+        document_id: tempId,
+        department: section,
+        document_type_name: matchingDocType ? matchingDocType.name : suggestedType,
+        created_date: aiSuggestions.doc_date_suggestion.value || today,
+        title: aiSuggestions.title_suggestion.value || docTitle,
+        original_filename: filename,
+      });
+
+      // Store archived PDF under a policy-generated logical key.
+      let storedArch = null;
+      const archiveSourcePath = ocrResult.archivePdfPath && fs.existsSync(ocrResult.archivePdfPath)
+        ? ocrResult.archivePdfPath
+        : storedOrig.path;
+      storedArch = storage.storeArchivedByKey(archivePlan.storageKey, archiveSourcePath);
+      if (ocrResult.archivePdfPath && fs.existsSync(ocrResult.archivePdfPath)) {
+        try { fs.unlinkSync(ocrResult.archivePdfPath); } catch (e) {}
+      }
+
       // Create Document in Database
       const newDoc = docService.createDocument({
         title: aiSuggestions.title_suggestion.value || docTitle,
         content: ocrResult.text || '',
         created_date: aiSuggestions.doc_date_suggestion.value || today,
+        document_type_id: matchingDocType ? matchingDocType.id : null,
         original_filename: filename,
         original_file_path: storedOrig.path,
         original_checksum: storedOrig.checksum,
@@ -592,6 +644,17 @@ function setupNativeIpcHandlers(appDataDir) {
         custom_fields: customFieldValues,
       });
 
+      let thumbnailStatus = { success: false, error: null };
+      try {
+        const thumb = await thumbnailService.generateForPdf(newDoc.id, storedArch.path, { title: newDoc.title });
+        const refreshedDoc = docService.setThumbnailPath(newDoc.id, thumb.relativePath);
+        newDoc.thumbnail_path = refreshedDoc.thumbnail_path;
+        thumbnailStatus = { success: true, path: thumb.relativePath, reused: thumb.reused };
+      } catch (thumbErr) {
+        thumbnailStatus = { success: false, error: thumbErr.message };
+        archiveService.log('WARN', 'Thumbnail', `تعذر توليد مصغر للوثيقة #${newDoc.id}: ${thumbErr.message}`);
+      }
+
       // Cleanup staged file
       storage.removeStaged(filename);
 
@@ -600,6 +663,8 @@ function setupNativeIpcHandlers(appDataDir) {
         status: 'SUCCESS',
         document: newDoc,
         aiSuggestions,
+        archivePlan,
+        thumbnail: thumbnailStatus,
       };
     } catch (err) {
       return { success: false, status: 'FAILED', error: err.message };

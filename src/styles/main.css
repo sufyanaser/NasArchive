@@ -821,8 +821,73 @@ body {
 .doc-thumb-container img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   object-position: top;
+  background: #f8fafc;
+  padding: 8px;
+}
+
+.doc-thumb-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: var(--bg-surface-elevated);
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.doc-list-thumb {
+  width: 54px;
+  height: 72px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  overflow: hidden;
+  background: var(--bg-surface-elevated);
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+
+.doc-list-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: top;
+  background: #f8fafc;
+}
+
+.doc-list-thumb .doc-thumb-fallback svg {
+  width: 22px !important;
+  height: 22px !important;
+}
+
+.metadata-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.advanced-details {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  background: var(--bg-surface-elevated);
+}
+
+.advanced-details summary {
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.advanced-details[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .doc-badge-dept {

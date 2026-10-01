@@ -212,13 +212,13 @@ class ImportController {
 
     this.dom.archiveBtn.disabled = true;
     this.dom.cancelBtn.disabled = true;
-    this._showProgress(true, 'جاري ترحيل الوثيقة والأرشفة في Paperless...');
+    this._showProgress(true, 'جاري اعتماد البيانات وأرشفة الوثيقة وفق قواعد التخزين...');
 
     try {
       const payload = {
         filename: this.stagedDoc.filename,
         section: this.selectedDepartment,
-        allow_duplicate: this.dom.duplicateCheckbox.checked,
+        allowDuplicate: this.dom.duplicateCheckbox.checked,
       };
 
       const res = await window.api.scanArchive(payload);
@@ -239,7 +239,7 @@ class ImportController {
       }
 
       if (task.status === 'SUCCESS' && task.result) {
-        this._showProgress(true, 'تمت أرشفة الوثيقة وفهرستها بنجاح!');
+        this._showProgress(true, 'تمت الأرشفة وتوليد المصغّر وفهرسة الوثيقة بنجاح!');
         setTimeout(() => {
           this.cancelStagedFile();
           if (window.appRouter) {
