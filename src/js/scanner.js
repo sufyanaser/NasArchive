@@ -108,7 +108,7 @@ class ScannerController {
 
   /**
    * STAGE A: Scan document and display immediately in preview.
-   * Does NOT submit to Paperless.
+   * Does not archive until the user explicitly confirms the staging preview.
    */
   async executeStageAScan() {
     const payload = {
@@ -348,7 +348,7 @@ class ScannerController {
       }
     } catch (err) {
       this._showProgress(false);
-      alert(`خطأ أثناء الأرشفة في Paperless:\n${err.message}`);
+      alert(`خطأ أثناء الأرشفة المحلية:\n${err.message}`);
     } finally {
       this.dom.rescanBtn.disabled = false;
       this.dom.archiveBtn.disabled = false;
