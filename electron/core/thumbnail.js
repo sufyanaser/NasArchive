@@ -151,6 +151,28 @@ ${fallback}
       dataUrl: `data:${mimeType};base64,${data.toString('base64')}`,
     };
   }
+
+  savePngDataUrl(documentId, dataUrl) {
+    const id = Number(documentId);
+    if (!Number.isInteger(id) || id <= 0) {
+      throw new Error('Invalid document id for thumbnail.');
+    }
+    const match = String(dataUrl || '').match(/^data:image\/png;base64,([A-Za-z0-9+/=]+)$/);
+    if (!match) {
+      throw new Error('Thumbnail payload must be a PNG data URL.');
+    }
+    const buffer = Buffer.from(match[1], 'base64');
+    if (buffer.length < 16 || buffer.readUInt32BE(0) !== 0x89504e47) {
+      throw new Error('Thumbnail payload is not a valid PNG.');
+    }
+    const thumbnailPath = this.getThumbnailPath(id);
+    fs.writeFileSync(thumbnailPath, buffer);
+    return {
+      success: true,
+      path: thumbnailPath,
+      relativePath: path.relative(storage.baseDir, thumbnailPath),
+    };
+  }
 }
 
 module.exports = new ThumbnailService();

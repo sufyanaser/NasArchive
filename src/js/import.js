@@ -126,13 +126,16 @@ class ImportController {
     this._showProgress(true, 'جاري فحص الملف وتجهيز المعاينة...');
 
     try {
+      if (!String(filename || '').toLowerCase().endsWith('.pdf')) {
+        throw new Error('الاستيراد اليدوي يدعم ملفات PDF حالياً. استخدم المسح الضوئي للصور أو حوّل الصورة إلى PDF.');
+      }
       const res = await window.api.importStage(filename, base64Data, this.selectedDepartment);
       if (res.error) throw new Error(res.error);
 
       if (res.result) {
         this.stagedDoc = res.result;
         this.dom.fileNameLabel.textContent = filename;
-        const kb = Math.round(res.result.size_bytes / 1024);
+        const kb = Math.round((res.result.size_bytes || res.result.size || 0) / 1024);
         this.dom.fileSizeLabel.textContent = `${kb} كيلوبايت`;
 
         this.dom.initialControls.style.display = 'none';

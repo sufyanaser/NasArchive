@@ -334,9 +334,7 @@ function setupIpcHandlers() {
       title: 'اختر وثيقة للاستيراد',
       properties: ['openFile'],
       filters: [
-        { name: 'Supported Documents', extensions: ['pdf', 'png', 'jpg', 'jpeg', 'tif', 'tiff'] },
         { name: 'PDF Documents', extensions: ['pdf'] },
-        { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'tif', 'tiff'] },
       ],
       ...options,
     });

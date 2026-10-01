@@ -56,6 +56,7 @@ contextBridge.exposeInMainWorld('nasArchive', {
     bulkSetCorrespondent: (ids, correspondentId) => ipcRenderer.invoke('documents:bulk-set-correspondent', { ids, correspondentId }),
     readBinary: (id) => ipcRenderer.invoke('documents:read-binary', id),
     getThumbnail: (id) => ipcRenderer.invoke('documents:thumbnail', id),
+    saveRenderedThumbnail: (id, dataUrl) => ipcRenderer.invoke('documents:save-rendered-thumbnail', { id, dataUrl }),
     exportFile: (id) => ipcRenderer.invoke('documents:export-file', id),
     getTags: () => ipcRenderer.invoke('documents:get-tags'),
     getDocumentTypes: () => ipcRenderer.invoke('documents:get-types'),

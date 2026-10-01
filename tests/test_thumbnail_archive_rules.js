@@ -83,6 +83,16 @@ async function run() {
     dataUrl.dataUrl.startsWith('data:image/svg+xml;base64,')
   );
 
+  const pngPayload = 'data:image/png;base64,' + Buffer.from([
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+    0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52,
+  ]).toString('base64');
+  const savedPng = thumbnail.savePngDataUrl(doc.id, pngPayload);
+  assert.strictEqual(savedPng.success, true, 'Renderer PNG thumbnail must be saved.');
+  const pngDataUrl = thumbnail.readDataUrl(doc.id);
+  assert.strictEqual(pngDataUrl.mimeType, 'image/png');
+  assert.ok(pngDataUrl.dataUrl.startsWith('data:image/png;base64,'));
+
   const corruptPath = path.join(storage.dirs.staging, 'corrupt.pdf');
   fs.writeFileSync(corruptPath, Buffer.from('NOT_A_PDF'));
   await assert.rejects(

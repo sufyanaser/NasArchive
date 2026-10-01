@@ -271,6 +271,22 @@ function setupNativeIpcHandlers(appDataDir) {
     }
   });
 
+  ipcMain.handle('documents:save-rendered-thumbnail', async (event, { id, dataUrl }) => {
+    try {
+      const docId = Number(id);
+      if (!Number.isInteger(docId) || docId <= 0) {
+        throw new Error('معرف الوثيقة غير صالح.');
+      }
+      const doc = docService.getDocument(docId);
+      if (!doc) throw new Error(`Document #${docId} not found.`);
+      const saved = thumbnailService.savePngDataUrl(docId, dataUrl);
+      docService.setThumbnailPath(docId, saved.relativePath);
+      return thumbnailService.readDataUrl(docId);
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
   ipcMain.handle('documents:export-file', async (event, id) => {
     try {
       const doc = docService.getDocument(id);
@@ -379,6 +395,9 @@ function setupNativeIpcHandlers(appDataDir) {
     try {
       if (!filename || !fileDataB64) {
         throw new Error('بيانات الملف غير مكتملة.');
+      }
+      if (path.extname(filename).toLowerCase() !== '.pdf') {
+        throw new Error('الاستيراد اليدوي يدعم ملفات PDF حالياً. حوّل الصور إلى PDF أو استخدم المسح الضوئي.');
       }
       const buffer = Buffer.from(fileDataB64, 'base64');
       if (buffer.length === 0) {

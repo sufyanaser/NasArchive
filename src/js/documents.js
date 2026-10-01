@@ -838,7 +838,11 @@ class DocumentsController {
     if (!container || !doc || !window.api || !window.api.getDocumentThumbnail) return;
     try {
       const res = await window.api.getDocumentThumbnail(doc.id);
-      if (!res || !res.success || !res.dataUrl) {
+      let dataUrl = res && res.success ? res.dataUrl : null;
+      if (!dataUrl || (res.mimeType && res.mimeType !== 'image/png')) {
+        dataUrl = await this._renderAndPersistThumbnail(doc.id);
+      }
+      if (!dataUrl) {
         container.classList.add('thumb-missing');
         container.querySelector('.doc-thumb-fallback span')?.replaceChildren(document.createTextNode('مصغّر غير متاح'));
         return;
@@ -847,7 +851,7 @@ class DocumentsController {
       img.loading = 'lazy';
       img.decoding = 'async';
       img.alt = doc.title || 'Document thumbnail';
-      img.src = res.dataUrl;
+      img.src = dataUrl;
       img.addEventListener('error', () => {
         container.innerHTML = this._thumbnailFallbackHtml('تعذر تحميل المصغّر');
       });
@@ -856,6 +860,44 @@ class DocumentsController {
       container.classList.toggle('compact-thumb', compact);
     } catch (e) {
       container.innerHTML = this._thumbnailFallbackHtml('تعذر تحميل المصغّر');
+    }
+  }
+
+  async _renderAndPersistThumbnail(docId) {
+    if (!window.pdfjsLib || !window.nasArchive || !window.nasArchive.documents) return null;
+    try {
+      const bin = await window.nasArchive.documents.readBinary(docId);
+      if (!bin.success || !bin.base64) return null;
+
+      const binaryStr = atob(bin.base64);
+      const bytes = new Uint8Array(binaryStr.length);
+      for (let i = 0; i < binaryStr.length; i++) {
+        bytes[i] = binaryStr.charCodeAt(i);
+      }
+
+      const pdf = await window.pdfjsLib.getDocument({ data: bytes }).promise;
+      const page = await pdf.getPage(1);
+      const viewport = page.getViewport({ scale: 1 });
+      const targetWidth = 360;
+      const scale = targetWidth / viewport.width;
+      const scaled = page.getViewport({ scale });
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d', { alpha: false });
+      canvas.width = Math.round(scaled.width);
+      canvas.height = Math.round(scaled.height);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      await page.render({ canvasContext: ctx, viewport: scaled }).promise;
+      const dataUrl = canvas.toDataURL('image/png');
+
+      if (window.nasArchive.documents.saveRenderedThumbnail) {
+        const saved = await window.nasArchive.documents.saveRenderedThumbnail(docId, dataUrl);
+        if (saved && saved.success && saved.dataUrl) return saved.dataUrl;
+      }
+      return dataUrl;
+    } catch (e) {
+      console.warn('Rendered thumbnail generation failed:', e);
+      return null;
     }
   }
 
