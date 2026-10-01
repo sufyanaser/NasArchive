@@ -21,7 +21,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Validate version and create release tag
+      - name: Validate version and ensure release tag
         shell: bash
         run: |
           VERSION="$(node -p "require('./package.json').version")"
@@ -32,8 +32,8 @@ jobs:
           fi
           TAG="v${VERSION}"
           if git rev-parse "${TAG}" >/dev/null 2>&1; then
-            echo "Tag ${TAG} already exists; refusing to overwrite." >&2
-            exit 1
+            echo "Tag ${TAG} already exists; using it as the immutable release source."
+            exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -41,12 +41,26 @@ jobs:
           git push origin "${TAG}"
 
   release-windows:
-    if: github.ref_type == 'tag'
+    needs: create-tag
+    if: always() && (github.ref_type == 'tag' || (github.ref_type == 'branch' && needs.create-tag.result == 'success'))
     runs-on: windows-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve immutable release source
+        shell: pwsh
+        run: |
+          if ('${{ github.ref_type }}' -eq 'branch') {
+            $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+            $tag = "v$version"
+            git fetch --tags --force
+            git checkout $tag
+            Write-Host "Building immutable release source $tag"
+          }
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -67,20 +81,32 @@ jobs:
       - name: Run JavaScript regression tests
         run: npm test
 
-      - name: Build and publish Windows release
-        run: npm run dist -- --publish always
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build Windows installer
+        run: npm run dist -- --publish never
 
       - name: Verify release artifacts
+        id: verify
         shell: pwsh
         run: |
-          $installer = Get-ChildItem -Path dist -Filter "*Setup*.exe" | Select-Object -First 1
-          if (-not $installer) {
-            throw "Windows installer was not produced."
-          }
-          if ($installer.Length -le 0) {
-            throw "Windows installer is empty."
-          }
-          Write-Host "Installer: $($installer.FullName)"
-          Write-Host "Size: $($installer.Length) bytes"
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $installer = Get-ChildItem -Path dist -Filter "NAS-Archive-Setup-$version.exe" | Select-Object -First 1
+          $latest = Join-Path (Resolve-Path dist) 'latest.yml'
+          if (-not $installer) { throw "Windows installer was not produced." }
+          if ($installer.Length -le 0) { throw "Windows installer is empty." }
+          if (-not (Test-Path $latest)) { throw "latest.yml was not produced." }
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "installer=$($installer.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "latest=$latest" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $version = '${{ steps.verify.outputs.version }}'
+          $tag = "v$version"
+          $notes = "release_notes_v$version.md"
+          if (-not (Test-Path $notes)) { throw "Release notes file missing: $notes" }
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) { throw "Release $tag already exists; refusing to overwrite." }
+          gh release create $tag '${{ steps.verify.outputs.installer }}' '${{ steps.verify.outputs.latest }}' --title $version --notes-file $notes --latest
