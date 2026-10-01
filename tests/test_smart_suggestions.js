@@ -204,6 +204,16 @@ async function main() {
   res = suggestions.getSuggestions('sender', '', { department: 'NAS FM', limit: 5 });
   assert.strictEqual(res.suggestions[0].value, 'مديرية تربية الأنبار', 'Context department should improve ranking.');
 
+  res = suggestions.getSuggestions('title', 'doc', { department: 'تناسق', documentId: 1, limit: 5 });
+  assert(res.suggestions.every((s) => s.field === 'title'), 'Title suggestions should use title field key.');
+  assert(res.suggestions.every((s) => s.value !== 'doc-a'), 'Current document should be excluded from title suggestions.');
+
+  res = suggestions.getSuggestions('department', 'nas', { limit: 5 });
+  assert.strictEqual(res.suggestions[0].value, 'NAS FM', 'Department suggestions should come from allowed workspace names.');
+
+  res = suggestions.getSuggestions('document_type', 'كتاب', { limit: 5 });
+  assert(res.suggestions.some((s) => s.value === 'كتاب وارد'), 'Document type suggestions should come from local lookup values.');
+
   createDoc(root, 'doc-new-value', 'تناسق', {
     'الجهة المرسلة': 'دائرة المنظمات غير الحكومية',
   }, '2026-01-06T00:00:00.000Z');

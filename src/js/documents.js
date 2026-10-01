@@ -111,6 +111,7 @@ class DocumentsController {
       modalCloseBtn: document.getElementById('modalCloseBtn'),
       modalSaveBtn: document.getElementById('modalSaveBtn'),
       modalApproveBtn: document.getElementById('modalApproveBtn'),
+      modalRevealBtn: document.getElementById('modalRevealBtn'),
       modalDownloadBtn: document.getElementById('modalDownloadBtn'),
       modalDeleteBtn: document.getElementById('modalDeleteBtn'),
 
@@ -210,6 +211,7 @@ class DocumentsController {
     if (this.dom.modalCloseBtn) this.dom.modalCloseBtn.addEventListener('click', () => this.closeModal());
     if (this.dom.modalSaveBtn) this.dom.modalSaveBtn.addEventListener('click', () => this.saveDocumentChanges());
     if (this.dom.modalApproveBtn) this.dom.modalApproveBtn.addEventListener('click', () => this.approveDocument());
+    if (this.dom.modalRevealBtn) this.dom.modalRevealBtn.addEventListener('click', () => this.revealActiveDocument());
     if (this.dom.modalDownloadBtn) this.dom.modalDownloadBtn.addEventListener('click', () => this.downloadActiveDocument());
     if (this.dom.modalDeleteBtn) this.dom.modalDeleteBtn.addEventListener('click', () => this.deleteActiveDocument());
 
@@ -703,6 +705,7 @@ class DocumentsController {
           </div>
           <div style="display: flex; gap: 6px; margin-top: 8px; justify-content: flex-end;">
             <button class="icon-btn btn-quick-view" title="معاينة وتعديل"><svg style="width: 15px; height: 15px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+            <button class="icon-btn btn-quick-reveal" title="إظهار في المجلد"><svg style="width: 15px; height: 15px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 7h5l2 2h11v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M3 7V5a2 2 0 0 1 2-2h4l2 2h4"/></svg></button>
             <button class="icon-btn btn-quick-download" title="تحميل الملف الأصلي"><svg style="width: 15px; height: 15px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
           </div>
         </div>
@@ -719,6 +722,10 @@ class DocumentsController {
       card.querySelector('.btn-quick-view').addEventListener('click', (e) => {
         e.stopPropagation();
         this.openDocumentModal(doc);
+      });
+      card.querySelector('.btn-quick-reveal').addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.revealDocumentDirect(doc.id);
       });
       card.querySelector('.btn-quick-download').addEventListener('click', (e) => {
         e.stopPropagation();
@@ -760,6 +767,7 @@ class DocumentsController {
           <td class="ltr">${createdDate}</td>
           <td>
             <button class="icon-btn" onclick="window.documentsController.openDocumentModalById(${doc.id})" title="تعديل"><svg style="width: 14px; height: 14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+            <button class="icon-btn" onclick="event.stopPropagation(); window.documentsController.revealDocumentDirect(${doc.id})" title="إظهار في المجلد"><svg style="width: 14px; height: 14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 7h5l2 2h11v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M3 7V5a2 2 0 0 1 2-2h4l2 2h4"/></svg></button>
             <button class="icon-btn" onclick="window.documentsController.downloadDocumentDirect(${doc.id})" title="تحميل"><svg style="width: 14px; height: 14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
           </td>
         </tr>
@@ -804,6 +812,7 @@ class DocumentsController {
           </div>
           <div style="display: flex; gap: 6px;">
             <button class="icon-btn" onclick="window.documentsController.openDocumentModalById(${doc.id})" title="معاينة"><svg style="width: 14px; height: 14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button>
+            <button class="icon-btn" onclick="event.stopPropagation(); window.documentsController.revealDocumentDirect(${doc.id})" title="إظهار في المجلد"><svg style="width: 14px; height: 14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 7h5l2 2h11v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M3 7V5a2 2 0 0 1 2-2h4l2 2h4"/></svg></button>
             <button class="icon-btn" onclick="window.documentsController.downloadDocumentDirect(${doc.id})" title="تنزيل"><svg style="width: 14px; height: 14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>
           </div>
         </div>
@@ -1478,6 +1487,26 @@ class DocumentsController {
   async downloadActiveDocument() {
     if (!this.activeDocument) return;
     await this.downloadDocumentDirect(this.activeDocument.id);
+  }
+
+  async revealActiveDocument() {
+    if (!this.activeDocument) return;
+    await this.revealDocumentDirect(this.activeDocument.id);
+  }
+
+  async revealDocumentDirect(docId) {
+    if (window.nasArchive && window.nasArchive.documents && window.nasArchive.documents.reveal) {
+      try {
+        const res = await window.nasArchive.documents.reveal(docId);
+        if (res.success) {
+          window.notifications.success('تم فتح موقع الملف المحلي.');
+          return;
+        }
+        window.notifications.error(res.error || 'تعذر فتح موقع الملف المحلي.');
+      } catch (ipcErr) {
+        window.notifications.error(`تعذر فتح موقع الملف: ${ipcErr.message}`);
+      }
+    }
   }
 
   async downloadDocumentDirect(docId) {
