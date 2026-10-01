@@ -33,7 +33,7 @@ function setupNativeIpcHandlers(appDataDir) {
 
       return {
         success: true,
-        engine: 'NAS Archive Native v2.0',
+        engine: 'NAS Archive Native',
         dockerRequired: false,
         wslRequired: false,
         database: {
