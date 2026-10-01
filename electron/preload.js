@@ -58,6 +58,7 @@ contextBridge.exposeInMainWorld('nasArchive', {
     getThumbnail: (id) => ipcRenderer.invoke('documents:thumbnail', id),
     saveRenderedThumbnail: (id, dataUrl) => ipcRenderer.invoke('documents:save-rendered-thumbnail', { id, dataUrl }),
     exportFile: (id) => ipcRenderer.invoke('documents:export-file', id),
+    reveal: (id) => ipcRenderer.invoke('documents:reveal', id),
     getTags: () => ipcRenderer.invoke('documents:get-tags'),
     getDocumentTypes: () => ipcRenderer.invoke('documents:get-types'),
     getCustomFields: () => ipcRenderer.invoke('documents:get-custom-fields'),

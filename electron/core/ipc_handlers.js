@@ -3,7 +3,7 @@
  * Registers all validated IPC communication channels between Electron Renderer and Native Core.
  * Completely eliminates any localhost HTTP servers or external ports.
  */
-const { ipcMain } = require('electron');
+const { ipcMain, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const dbManager = require('./db');
@@ -21,6 +21,7 @@ const thumbnailService = require('./thumbnail');
 const archiveRules = require('./archive_rules');
 const enhancementService = require('./enhancement');
 const smartSuggestions = require('./smart_suggestions');
+const fileReveal = require('./file_reveal');
 
 function setupNativeIpcHandlers(appDataDir) {
   // 1. System & Engine Health Status
@@ -312,6 +313,21 @@ function setupNativeIpcHandlers(appDataDir) {
         return { success: true, savedPath: res.filePath };
       }
       return { success: false, canceled: true };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('documents:reveal', async (event, id) => {
+    try {
+      const docId = Number(id);
+      if (!Number.isInteger(docId) || docId <= 0) {
+        throw new Error('معرف الوثيقة غير صالح.');
+      }
+      const doc = docService.getDocument(docId);
+      const result = fileReveal.revealDocument(doc, shell);
+      archiveService.log('INFO', 'Documents', `تم فتح موقع ملف الوثيقة #${docId}`);
+      return result;
     } catch (err) {
       return { success: false, error: err.message };
     }
